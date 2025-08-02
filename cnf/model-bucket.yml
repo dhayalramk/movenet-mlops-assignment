@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket for storing versioned MoveNet models (kaggle/custom)
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - stg
+      - prod
+    Description: Environment (used in bucket name)
+
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID used in bucket naming
+
+Resources:
+  MoveNetModelBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWSAccountId}-${Env}-movenet-bucket"
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: app
+          Value: movenet
+        - Key: environment
+          Value: !Ref Env
+
+Outputs:
+  BucketName:
+    Description: Name of the created model bucket
+    Value: !Ref MoveNetModelBucket
+
+  BucketArn:
+    Description: ARN of the model bucket
+    Value: !GetAtt MoveNetModelBucket.Arn
