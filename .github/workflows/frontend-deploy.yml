@@ -1,0 +1,46 @@
+name: Frontend CI/CD (S3 + CloudFront)
+
+on:
+  push:
+    branches: [main, frontend]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-deploy.yml"
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ap-south-1
+      ENV: prod
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DIST_ID }}
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🧾 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📤 Sync Frontend to S3
+        run: |
+          aws s3 sync ./frontend s3://${{ env.AWS_ACCOUNT_ID }}-${{ env.ENV }}-movenet-frontend \
+            --region $AWS_REGION \
+            --delete \
+            --acl public-read \
+            --cache-control "max-age=0, no-cache, no-store, must-revalidate"
+
+      - name: 🚀 Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --paths "/*"
