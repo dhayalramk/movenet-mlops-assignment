@@ -2,60 +2,63 @@ name: Backend CI/CD (App Runner via ECR)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, backend]
     paths:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
 
-env:
-  AWS_REGION: ap-south-1
-  BACKEND_IMAGE_NAME: movenet-backend
-  ENV: prod
-
 jobs:
   build-and-deploy:
-    name: Build and Deploy Backend
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       id-token: write
 
+    env:
+      AWS_REGION: ap-south-1
+      BACKEND_IMAGE_NAME: movenet-backend
+      ENV: prod
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      APP_RUNNER_SERVICE_NAME: movenet-backend-service
+
     steps:
-      - name: Checkout Code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: 🧾 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: 🔐 Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Get AWS Account ID
-        id: account
+      - name: 🐳 Build and Push Docker Image
         run: |
-          echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)" >> $GITHUB_ENV
+          IMAGE_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}
+          docker build -t $IMAGE_URI ./backend
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
-      - name: Build, Tag, and Push Docker Image to ECR
+      - name: 🚀 Deploy to App Runner
         run: |
-          REPO_NAME=${{ env.BACKEND_IMAGE_NAME }}-${{ env.ENV }}
-          ECR_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$REPO_NAME
-
-          aws ecr describe-repositories --repository-names $REPO_NAME || \
-          aws ecr create-repository --repository-name $REPO_NAME
-
-          docker build -t $REPO_NAME backend/
-          docker tag $REPO_NAME:latest $ECR_URI:latest
-          docker push $ECR_URI:latest
-
-      - name: Deploy to App Runner
-        run: |
-          SERVICE_NAME=movenet-backend-${{ env.ENV }}
-          ECR_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}-${{ env.ENV }}
-
-          aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$SERVICE_NAME']" | grep ServiceArn && \
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$SERVICE_NAME'].ServiceArn" --output text) && \
-          aws apprunner start-deployment --service-arn $SERVICE_ARN || echo "Initial deploy must be manual via console or separate script."
+          aws apprunner update-service \
+            --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "'"$IMAGE_URI"'",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {
+                  "Port": "8080",
+                  "RuntimeEnvironmentVariables": {
+                    "ENV": "'"${{ env.ENV }}"'",
+                    "AWS_REGION": "'"${{ env.AWS_REGION }}"'",
+                    "AWS_ACCOUNT_ID": "'"${{ env.AWS_ACCOUNT_ID }}"'"
+                  }
+                }
+              },
+              "AutoDeploymentsEnabled": true
+            }'
