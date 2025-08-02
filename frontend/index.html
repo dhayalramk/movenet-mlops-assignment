@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MoveNet Pose Detection</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.13.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    video, canvas { width: 640px; height: 480px; border: 1px solid #ccc; }
+    #result { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>MoveNet Pose Detection</h1>
+
+  <label for="modelType">Choose model type:</label>
+  <select id="modelType">
+    <option value="SinglePose.Lightning">SinglePose.Lightning</option>
+    <option value="SinglePose.Thunder">SinglePose.Thunder</option>
+    <option value="MultiPose.Lightning">MultiPose.Lightning</option>
+  </select>
+
+  <br><br>
+  <video id="video" autoplay muted playsinline></video>
+  <br />
+  <button onclick="runInference()">Run Pose Detection</button>
+
+  <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+  <div id="result"></div>
+
+  <script>
+    let detector, video, selectedModel = "SinglePose.Lightning";
+
+    async function setupCamera() {
+      video = document.getElementById("video");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+
+    async function loadModel() {
+      const modelType = document.getElementById("modelType").value;
+      selectedModel = modelType;
+
+      let typeEnum = poseDetection.SupportedModels.MoveNet;
+      let modelConfig = { modelType: modelType };
+
+      detector = await poseDetection.createDetector(typeEnum, modelConfig);
+    }
+
+    async function runInference() {
+      await loadModel();  // Load model based on current selection
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const poses = await detector.estimatePoses(video);
+      const keypoints = poses[0]?.keypoints || [];
+
+      const base64Image = canvas.toDataURL("image/jpeg");
+
+      const payload = {
+        session_id: "session-" + Date.now(),
+        model_version: selectedModel,
+        keypoints: keypoints,
+        metadata: {
+          device: navigator.userAgent,
+          type: "webcam"
+        },
+        image_base64: base64Image
+      };
+
+      document.getElementById("result").innerText = JSON.stringify(payload, null, 2);
+
+      const response = await fetch("https://your-backend-domain/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      console.log("Upload Result:", result);
+    }
+
+    async function init() {
+      await setupCamera();
+    }
+
+    init();
+  </script>
+</body>
+</html>
