@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create S3 bucket for MoveNet inference logs and uploads.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, stg, prod]
+
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID
+
+Resources:
+
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWSAccountId}-${Environment}-movenet-logs"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldLogs
+            Status: Enabled
+            ExpirationInDays: 60
+            Prefix: inference/
+            NoncurrentVersionExpirationInDays: 30
+
+  LogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowBackendToWriteLogs
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWSAccountId}:root"
+            Action: 
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+            Resource: !Sub "${LogsBucket.Arn}/*"
+
+Outputs:
+
+  LogsBucketName:
+    Value: !Ref LogsBucket
+
+  LogsBucketArn:
+    Value: !GetAtt LogsBucket.Arn
