@@ -32,6 +32,8 @@
   <script>
     let detector, video, selectedModel = "SinglePose.Lightning";
 
+    const CLOUDFRONT_BASE_URL = "https://d2winlq3m1yqc3.cloudfront.net/models";
+
     async function setupCamera() {
       video = document.getElementById("video");
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -47,9 +49,15 @@
       selectedModel = modelType;
 
       let typeEnum = poseDetection.SupportedModels.MoveNet;
-      let modelConfig = { modelType: modelType };
 
-      detector = await poseDetection.createDetector(typeEnum, modelConfig);
+      const modelUrl = `${CLOUDFRONT_BASE_URL}/${modelType.toLowerCase().replace(".", "-")}/model.json`;
+
+      detector = await poseDetection.createDetector(typeEnum, {
+        modelType: modelType,
+        modelUrl: modelUrl
+      });
+
+      console.log("✅ Model loaded from:", modelUrl);
     }
 
     async function runInference() {
