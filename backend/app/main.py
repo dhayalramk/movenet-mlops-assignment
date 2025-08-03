@@ -1,11 +1,20 @@
 from fastapi import FastAPI
 from app.routes import router as api_router
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 app = FastAPI(
     title="MoveNet Backend API",
     version="1.0.0",
     description="Backend for MoveNet pose detection MLOps project"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or replace "*" with your CloudFront domain to restrict
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Health check route
