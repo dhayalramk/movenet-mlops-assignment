@@ -1,89 +1,84 @@
+#!/usr/bin/env python3
 import os
-import boto3
+import shutil
+import subprocess
+import tarfile
 import requests
+import boto3
 from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ---------- Configuration ----------
-ENV = os.getenv("ENV", "prod")
-REGION = os.getenv("AWS_REGION", "ap-south-1")
-ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
-VERSION = os.getenv("MODEL_VERSION", datetime.utcnow().strftime("%Y%m%d"))
+ENV       = os.getenv("ENV", "prod")
+REGION    = os.getenv("AWS_REGION", "ap-south-1")
+ACCOUNT_ID= os.getenv("AWS_ACCOUNT_ID")
+VERSION   = os.getenv("MODEL_VERSION", datetime.utcnow().strftime("%Y%m%d"))
 
-BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
-MODEL_DIR = f"/tmp/movenet_tfjs_models_{VERSION}/"
+BUCKET    = f"{ACCOUNT_ID}-{ENV}-movenet-models"
+BASE_TMP  = f"/tmp/movenet_tfjs_models_{VERSION}"
+RAW_DIR   = os.path.join(BASE_TMP, "raw")
+OUT_DIR   = BASE_TMP
 S3_PREFIX = f"models/{VERSION}/"
 
-# TFJS-compatible model URLs
+# TF-Hub TF2 SavedModel compressed URLs
 MODELS = {
-    "singlepose-lightning": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/singlepose/lightning/model.json",
-    "singlepose-thunder": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/singlepose/thunder/model.json",
-    "multipose-lightning": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/multipose/lightning/model.json"
+    "singlepose-lightning":   "https://tfhub.dev/google/movenet/singlepose/lightning/4?tf-hub-format=compressed",
+    "singlepose-thunder":     "https://tfhub.dev/google/movenet/singlepose/thunder/4?tf-hub-format=compressed",
+    "multipose-lightning":    "https://tfhub.dev/google/movenet/multipose/lightning/1?tf-hub-format=compressed",
 }
 
-
-def download_tfjs_models():
-    print("▶️ Downloading TFJS models...")
-
-    os.makedirs(MODEL_DIR, exist_ok=True)
-
+def download_and_extract():
+    os.makedirs(RAW_DIR, exist_ok=True)
     for name, url in MODELS.items():
-        model_path = os.path.join(MODEL_DIR, name)
-        os.makedirs(model_path, exist_ok=True)
+        print(f"▶️  Downloading & extracting {name}...")
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+        tar_path = os.path.join(RAW_DIR, f"{name}.tar.gz")
+        with open(tar_path, "wb") as f:
+            for chunk in r.iter_content(8192):
+                f.write(chunk)
+        extract_to = os.path.join(RAW_DIR, name)
+        os.makedirs(extract_to, exist_ok=True)
+        with tarfile.open(tar_path, "r:gz") as tar:
+            tar.extractall(path=extract_to)
+        print(f"   ✅  Extracted saved_model for {name}")
 
-        try:
-            print(f"⏬ Downloading {name} model.json...")
-            model_json = requests.get(url)
-            model_json.raise_for_status()
-
-            model_json_path = os.path.join(model_path, "model.json")
-            with open(model_json_path, "wb") as f:
-                f.write(model_json.content)
-
-            # Parse JSON to get .bin files
-            bin_files = model_json.json().get("weightsManifest", [])[0].get("paths", [])
-
-            for bin_file in bin_files:
-                bin_url = url.replace("model.json", bin_file)
-                print(f"⏬ Downloading {bin_file}...")
-                bin_data = requests.get(bin_url)
-                bin_data.raise_for_status()
-                with open(os.path.join(model_path, bin_file), "wb") as f:
-                    f.write(bin_data.content)
-
-            print(f"✅ Downloaded: {name} with model.json and weights")
-
-        except Exception as e:
-            print(f"❌ Error downloading {name}: {e}")
-
+def convert_to_tfjs():
+    for name in MODELS:
+        src = os.path.join(RAW_DIR, name, "saved_model")
+        dst = os.path.join(OUT_DIR, name)
+        os.makedirs(dst, exist_ok=True)
+        print(f"🔄  Converting {name} → TF.js format…")
+        subprocess.run([
+            "tensorflowjs_converter",
+            "--input_format", "tf_saved_model",
+            "--output_format", "tfjs_graph_model",
+            "--signature_name", "serving_default",
+            "--saved_model_tags", "serve",
+            src, dst
+        ], check=True)
+        print(f"   ✅  {name} converted at {dst}")
 
 def upload_to_s3():
-    print("⬆️ Uploading to S3...")
-
     s3 = boto3.client("s3", region_name=REGION)
-
-    for root, dirs, files in os.walk(MODEL_DIR):
-        for file in files:
-            local_path = os.path.join(root, file)
-            relative_path = os.path.relpath(local_path, MODEL_DIR)
-
-            versioned_key = os.path.join(S3_PREFIX, relative_path).replace("\\", "/")
-            print(f"→ Uploading versioned: s3://{BUCKET_NAME}/{versioned_key}")
-            s3.upload_file(local_path, BUCKET_NAME, versioned_key)
-
-            if "/" in relative_path:
-                latest_key = os.path.join("models", relative_path).replace("\\", "/")
-                print(f"→ Uploading stable: s3://{BUCKET_NAME}/{latest_key}")
-                s3.upload_file(local_path, BUCKET_NAME, latest_key)
-
-    print("✅ Upload complete.")
-
+    for root, _, files in os.walk(OUT_DIR):
+        for fn in files:
+            if fn.endswith((".json",".bin")):
+                local = os.path.join(root, fn)
+                rel   = os.path.relpath(local, OUT_DIR).replace("\\","/")
+                for prefix in (S3_PREFIX, "models/"):
+                    key = prefix + rel
+                    print(f"⬆️  Uploading s3://{BUCKET}/{key}")
+                    s3.upload_file(local, BUCKET, key)
+    print("✅  Upload complete!")
 
 if __name__ == "__main__":
-    try:
-        download_tfjs_models()
-        upload_to_s3()
-    except Exception as err:
-        print(f"💥 Error: {err}")
+    # Clean out any prior state
+    if os.path.isdir(BASE_TMP):
+        shutil.rmtree(BASE_TMP)
+
+    download_and_extract()
+    convert_to_tfjs()
+    upload_to_s3()
