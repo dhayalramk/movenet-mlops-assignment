@@ -13,19 +13,6 @@ Parameters:
     Description: AWS Account ID used in bucket name
 
 Resources:
-  ModelBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "${AWSAccountId}-${Environment}-movenet-models"
-      OwnershipControls:
-        Rules:
-          - ObjectOwnership: BucketOwnerEnforced
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
   ModelOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
@@ -35,7 +22,7 @@ Resources:
   ModelBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref ModelBucket
+      Bucket: !Sub "${AWSAccountId}-${Environment}-movenet-models"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -44,7 +31,7 @@ Resources:
             Principal:
               CanonicalUser: !GetAtt ModelOAI.S3CanonicalUserId
             Action: "s3:GetObject"
-            Resource: !Sub "${ModelBucket.Arn}/*"
+            Resource: !Sub "arn:aws:s3:::${AWSAccountId}-${Environment}-movenet-models/*"
 
   ModelResponseHeadersPolicy:
     Type: AWS::CloudFront::ResponseHeadersPolicy
@@ -71,7 +58,7 @@ Resources:
         DefaultRootObject: ""
         Origins:
           - Id: S3ModelOrigin
-            DomainName: !GetAtt ModelBucket.RegionalDomainName
+            DomainName: !Sub "${AWSAccountId}-${Environment}-movenet-models.s3.amazonaws.com"
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${ModelOAI}"
         DefaultCacheBehavior:
@@ -90,10 +77,6 @@ Resources:
         PriceClass: PriceClass_100
 
 Outputs:
-  ModelBucketName:
-    Description: S3 Bucket for models
-    Value: !Ref ModelBucket
-
   ModelCloudFrontURL:
     Description: CloudFront URL for MoveNet models
     Value: !Sub "https://${ModelCloudFrontDistribution.DomainName}"
