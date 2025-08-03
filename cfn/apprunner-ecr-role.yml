@@ -4,7 +4,7 @@ Description: IAM Role for App Runner to pull image from ECR
 Parameters:
   RoleName:
     Type: String
-    Default: AppRunnerECRAccessRole
+    Default: AppRunnerECRAccessRoleV2
 
 Resources:
   AppRunnerECRAccessRole:
