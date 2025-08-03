@@ -21,8 +21,8 @@ jobs:
       APP_ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       APP_RUNNER_SERVICE_NAME: movenet-backend-service
-      ECR_ACCESS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccessRole
-
+      ECR_ACCESS_ROLE_ARN: ${{ env.ECR_ACCESS_ROLE_ARN }}
+      
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -43,6 +43,13 @@ jobs:
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
           docker build -t $IMAGE_URI ./backend
           docker push $IMAGE_URI
+
+      - name: ⚙️ Deploy IAM Role for App Runner
+        run: |
+          aws cloudformation deploy \
+            --template-file cfn/apprunner-ecr-role.yml \
+            --stack-name apprunner-ecr-role \
+            --capabilities CAPABILITY_NAMED_IAM
 
       - name: 🚀 Deploy App Runner via CloudFormation
         run: |
