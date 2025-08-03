@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFront distribution for MoveNet versioned models
+
+Parameters:
+  Env:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - stg
+      - prod
+    Description: Environment name (used in resource naming)
+
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID used in bucket name
+
+Resources:
+  ModelBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub "${AWSAccountId}-${Env}-movenet-models"
+
+  ModelBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ModelBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: "s3:GetObject"
+            Resource: !Sub "${ModelBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
+
+  ModelOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Access Identity for MoveNet Model Bucket
+
+  ModelCloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: ""
+        Origins:
+          - Id: S3ModelOrigin
+            DomainName: !Sub "${AWSAccountId}-${Env}-movenet-models.s3.amazonaws.com"
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${ModelOAI}"
+        DefaultCacheBehavior:
+          TargetOriginId: S3ModelOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Comment: !Sub "CloudFront CDN for MoveNet Models - ${Env}"
+        PriceClass: PriceClass_100
+
+Outputs:
+  ModelCDNDomain:
+    Description: CloudFront domain for serving versioned MoveNet models
+    Value: !GetAtt ModelCloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub "${Env}-ModelCDN"
