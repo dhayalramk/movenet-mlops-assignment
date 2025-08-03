@@ -67,5 +67,4 @@ jobs:
             --stack-name movenet-model-cloudfront \
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION \
-            --parameter-overrides Environment=$ENV AWSAccountId=$AWS_ACCOUNT_ID
-
+            --parameter-overrides Env=$ENV AWSAccountId=$AWS_ACCOUNT_ID
