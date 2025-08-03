@@ -35,7 +35,11 @@ def download_model():
     model_url = "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite"
     model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
-    response = requests.get(model_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    response = requests.get(model_url, headers=headers)
     if response.status_code != 200:
         raise Exception(f"❌ Failed to download model. HTTP {response.status_code}")
 
@@ -43,6 +47,7 @@ def download_model():
         f.write(response.content)
 
     print(f"✅ Model downloaded to {model_path}")
+
 
 
 # ---------- Upload to S3 ----------
