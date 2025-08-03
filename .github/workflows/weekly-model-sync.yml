@@ -49,7 +49,7 @@ jobs:
       - name: 🔍 Fetch CloudFront Distribution ID from Stack (optional)
         id: cf
         run: |
-          STACK_NAME=frontend-static-site
+          STACK_NAME=movenet-frontend-stack
           DIST_ID=$(aws cloudformation describe-stacks \
             --region $AWS_REGION \
             --stack-name $STACK_NAME \
