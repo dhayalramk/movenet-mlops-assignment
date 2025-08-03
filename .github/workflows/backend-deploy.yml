@@ -13,7 +13,7 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write  # still needed for OIDC fallback if used
+      id-token: write
 
     env:
       AWS_REGION: ap-south-1
@@ -46,13 +46,19 @@ jobs:
       - name: 🚀 Deploy to App Runner
         run: |
           SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
             --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn" \
             --output text)
 
           echo "Resolved SERVICE_ARN: $SERVICE_ARN"
 
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "❌ ERROR: App Runner service '${{ env.APP_RUNNER_SERVICE_NAME }}' not found."
+            exit 1
+          fi
+
           aws apprunner update-service \
-            --service-arn $SERVICE_ARN \
+            --service-arn "$SERVICE_ARN" \
             --region ${{ env.AWS_REGION }} \
             --source-configuration "$(jq -n \
               --arg IMAGE_URI "$IMAGE_URI" \
