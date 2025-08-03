@@ -22,27 +22,25 @@ Resources:
     Properties:
       BucketName: !Sub "${AWSAccountId}-${Env}-movenet-models"
 
-  ModelBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref ModelBucket
-      PolicyDocument:
-        Statement:
-          - Sid: PublicReadGetObject
-            Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Action: "s3:GetObject"
-            Resource: !Sub "${ModelBucket.Arn}/*"
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
-
   ModelOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: Access Identity for MoveNet Model Bucket
+
+  ModelBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ModelBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServiceGet
+            Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt ModelOAI.S3CanonicalUserId
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${AWSAccountId}-${Env}-movenet-models/*"
 
   ModelCloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -71,12 +69,18 @@ Resources:
               Forward: none
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
-        Comment: !Sub "CloudFront CDN for MoveNet Models - ${Env}"
+        Comment: !Sub "CDN for MoveNet Models - ${Env}"
         PriceClass: PriceClass_100
 
 Outputs:
-  ModelCDNDomain:
-    Description: CloudFront domain for serving versioned MoveNet models
+  ModelCloudFrontURL:
+    Description: CloudFront URL for MoveNet models
     Value: !GetAtt ModelCloudFrontDistribution.DomainName
     Export:
-      Name: !Sub "${Env}-ModelCDN"
+      Name: !Sub "${Env}-ModelCDN-URL"
+
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID
+    Value: !Ref ModelCloudFrontDistribution
+    Export:
+      Name: !Sub "${Env}-ModelCDN-ID"
