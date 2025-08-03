@@ -26,20 +26,23 @@ S3_PREFIX = f"models/{VERSION}/"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ---------- Download model from Kaggle ----------
+# ---------- Download model from TensorFlow Hub ----------
+
 def download_model():
-    print("▶️ Downloading model from Kaggle...")
+    print("▶️ Downloading model from TensorFlow Hub...")
 
-    os.environ["KAGGLE_USERNAME"] = KAGGLE_USERNAME
-    os.environ["KAGGLE_KEY"] = KAGGLE_KEY
+    model_url = "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite"
+    model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
-    subprocess.run([
-        "kaggle", "datasets", "download",
-        "-d", KAGGLE_MODEL_URL,
-        "-p", MODEL_DIR,
-        "--unzip"
-    ], check=True)
+    response = requests.get(model_url)
+    if response.status_code != 200:
+        raise Exception(f"❌ Failed to download model. HTTP {response.status_code}")
 
-    print(f"✅ Model downloaded to {MODEL_DIR}")
+    with open(model_path, "wb") as f:
+        f.write(response.content)
+
+    print(f"✅ Model downloaded to {model_path}")
+
 
 # ---------- Upload to S3 ----------
 def upload_to_s3():
