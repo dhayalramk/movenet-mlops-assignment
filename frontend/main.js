@@ -1,4 +1,5 @@
-const CLOUDFRONT_BASE_URL = "https://d2winlq3m1yqc3.cloudfront.net/models"; // your CloudFront
+// const CLOUDFRONT_BASE_URL = "https://d2winlq3m1yqc3.cloudfront.net/models";
+const CLOUDFRONT_BASE_URL = "https://d2lhrf3zzm7l1f.cloudfront.net/models";
 
 function getModelUrl(variant) {
   const map = {
