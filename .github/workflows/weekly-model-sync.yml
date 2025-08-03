@@ -41,12 +41,9 @@ jobs:
 
       - name: 🔄 Sync latest model from Kaggle to S3
         run: |
-          python scripts/upload_versioned_model.py \
-            --bucket $MODEL_BUCKET \
-            --region $AWS_REGION \
-            --env $ENV
+          python scripts/upload_versioned_model.py
 
-      - name: 🔍 Fetch CloudFront Distribution ID from Stack
+      - name: 🔍 Fetch CloudFront Distribution ID from Stack (optional)
         id: cf
         run: |
           STACK_NAME=frontend-static-site
@@ -54,15 +51,16 @@ jobs:
             --region $AWS_REGION \
             --stack-name $STACK_NAME \
             --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
-            --output text)
+            --output text || echo "")
           if [ -z "$DIST_ID" ]; then
-            echo "❌ CloudFront Distribution ID not found"
-            exit 1
+            echo "⚠️ CloudFront Distribution ID not found. Skipping invalidation."
+          else
+            echo "CLOUDFRONT_DIST_ID=$DIST_ID" >> $GITHUB_ENV
+            echo "✅ Found Distribution ID: $DIST_ID"
           fi
-          echo "CLOUDFRONT_DIST_ID=$DIST_ID" >> $GITHUB_ENV
-          echo "✅ CloudFront Distribution ID: $DIST_ID"
 
-      - name: 🚀 Invalidate CloudFront cache
+      - name: 🚀 Invalidate CloudFront cache (if available)
+        if: env.CLOUDFRONT_DIST_ID != ''
         run: |
           aws cloudfront create-invalidation \
             --distribution-id $CLOUDFRONT_DIST_ID \
