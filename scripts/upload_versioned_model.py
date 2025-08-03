@@ -16,12 +16,21 @@ BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
 MODEL_DIR = f"/tmp/movenet_model_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
-# Define model subdirectories and source URLs
+# Define model subdirectories and source URLs (TFHub redirectors)
 MODELS = {
-    "singlepose-lightning": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite",
-    "singlepose-thunder": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/thunder/tflite/float16/4.tflite",
-    "multipose-lightning": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/multipose/lightning/tflite/float16/1.tflite"
+    "singlepose-lightning": "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite",
+    "singlepose-thunder": "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/float16/4?lite-format=tflite",
+    "multipose-lightning": "https://tfhub.dev/google/lite-model/movenet/multipose/lightning/tflite/float16/1?lite-format=tflite"
 }
+
+# ---------- Check if file is valid binary ----------
+def is_valid_tflite(file_path):
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(4)
+            return header != b"<?xm"
+    except Exception:
+        return False
 
 # ---------- Download all models ----------
 def download_models():
@@ -39,8 +48,14 @@ def download_models():
                 "-o", output_file,
                 "-H", "User-Agent: Mozilla/5.0"
             ], check=True)
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"❌ Failed to download {name}. {e}")
+
+            if not is_valid_tflite(output_file):
+                raise Exception("Invalid file downloaded — likely an HTML/XML error page.")
+
+        except Exception as e:
+            print(f"❌ Skipping {name}: {e}")
+            continue
+
         print(f"✅ Downloaded: {output_file}")
 
 # ---------- Upload to S3 ----------
@@ -59,7 +74,7 @@ def upload_to_s3():
             print(f"→ Uploading versioned: s3://{BUCKET_NAME}/{versioned_key}")
             s3.upload_file(local_path, BUCKET_NAME, versioned_key)
 
-            # Upload to latest stable path
+            # Upload to stable/latest path
             if "/" in relative_path:
                 latest_key = os.path.join("models", relative_path).replace("\\", "/")
                 print(f"→ Uploading latest: s3://{BUCKET_NAME}/{latest_key}")
@@ -69,5 +84,8 @@ def upload_to_s3():
 
 # ---------- Run ----------
 if __name__ == "__main__":
-    download_models()
-    upload_to_s3()
+    try:
+        download_models()
+        upload_to_s3()
+    except Exception as err:
+        print(f"💥 Error: {err}")
