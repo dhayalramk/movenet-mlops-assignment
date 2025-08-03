@@ -5,7 +5,6 @@ import boto3
 import subprocess
 from datetime import datetime
 from dotenv import load_dotenv
-import requests
 
 load_dotenv()
 
@@ -26,29 +25,23 @@ S3_PREFIX = f"models/{VERSION}/"
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# ---------- Download model from Kaggle ----------
 # ---------- Download model from TensorFlow Hub ----------
-
 def download_model():
     print("▶️ Downloading model from TensorFlow Hub...")
 
     model_url = "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite"
     model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    response = requests.get(model_url, headers=headers)
-    if response.status_code != 200:
-        raise Exception(f"❌ Failed to download model. HTTP {response.status_code}")
-
-    with open(model_path, "wb") as f:
-        f.write(response.content)
+    try:
+        subprocess.run([
+            "curl", "-L", model_url,
+            "-o", model_path,
+            "-H", "User-Agent: Mozilla/5.0"
+        ], check=True)
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"❌ Failed to download model via curl. {e}")
 
     print(f"✅ Model downloaded to {model_path}")
-
-
 
 # ---------- Upload to S3 ----------
 def upload_to_s3():
