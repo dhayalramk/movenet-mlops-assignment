@@ -17,6 +17,9 @@ jobs:
       AWS_REGION: ap-south-1
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      MODEL_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-models
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
 
     permissions:
       contents: read
@@ -50,6 +53,19 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region $AWS_REGION \
             --parameter-overrides Environment=$ENV AWSAccountId=$AWS_ACCOUNT_ID
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10
+
+      - name: 📦 Install Python dependencies
+        run: |
+          pip install boto3 kaggle python-dotenv requests
+
+      - name: 🔄 Upload latest MoveNet model to S3
+        run: |
+          python scripts/upload_versioned_model.py
 
       - name: 🌐 Deploy Frontend CloudFront Stack
         run: |
