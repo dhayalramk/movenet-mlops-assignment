@@ -4,6 +4,7 @@ import boto3
 import subprocess
 from datetime import datetime
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -23,6 +24,38 @@ MODEL_DIR = f"/tmp/movenet_model_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+def get_cloudfront_info(stack_name: str):
+    print(f"🔍 Fetching CloudFront info from stack: {stack_name}")
+    result = subprocess.run([
+        "aws", "cloudformation", "describe-stacks",
+        "--stack-name", stack_name,
+        "--region", REGION,
+        "--query", "Stacks[0].Outputs",
+        "--output", "json"
+    ], stdout=subprocess.PIPE, check=True)
+
+    outputs = json.loads(result.stdout)
+    dist_id = None
+    dist_url = None
+
+    for item in outputs:
+        if item["OutputKey"] == "CloudFrontURL":
+            dist_url = item["OutputValue"]
+        elif item["OutputKey"] == "CloudFrontDistributionId":
+            dist_id = item["OutputValue"]
+
+    if not dist_url or not dist_id:
+        raise ValueError("❌ CloudFront values not found in stack outputs")
+
+    print(f"✅ CloudFront URL: {dist_url}")
+    print(f"✅ CloudFront Distribution ID: {dist_id}")
+    return dist_id, dist_url
+
+
+STACK_NAME = os.getenv("STACK_NAME", "frontend-static-site")
+CLOUDFRONT_DIST_ID, CLOUDFRONT_URL = get_cloudfront_info(STACK_NAME)
+
 
 # ---------- Download model from Kaggle ----------
 def download_model():
