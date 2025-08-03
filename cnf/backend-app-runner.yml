@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Backend infrastructure for MoveNet – ECR and App Runner
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, stg, prod]
+
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID
+
+  AWSRegion:
+    Type: String
+    Default: ap-south-1
+
+Resources:
+
+  ## 1. ECR Repo for Backend Image
+  BackendECRRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: movenet-backend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire old images",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  ## 2. App Runner Backend Service
+  BackendAppRunner:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: movenet-backend-service
+      SourceConfiguration:
+        ImageRepository:
+          ImageIdentifier: !Sub "${AWSAccountId}.dkr.ecr.${AWSRegion}.amazonaws.com/movenet-backend:latest"
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "8080"
+            RuntimeEnvironmentVariables:
+              ENV: !Ref Environment
+              AWS_REGION: !Ref AWSRegion
+              AWS_ACCOUNT_ID: !Ref AWSAccountId
+        AutoDeploymentsEnabled: true
+      InstanceConfiguration:
+        Cpu: "1 vCPU"
+        Memory: "2 GB"
+
+Outputs:
+
+  ECRRepoUri:
+    Description: URI of the ECR repo
+    Value: !Sub "${AWSAccountId}.dkr.ecr.${AWSRegion}.amazonaws.com/movenet-backend"
+
+  AppRunnerServiceUrl:
+    Description: URL of the deployed backend
+    Value: !GetAtt BackendAppRunner.ServiceUrl
