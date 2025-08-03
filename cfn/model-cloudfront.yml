@@ -83,6 +83,7 @@ Resources:
             Items:
               - GET
               - HEAD
+          AccessControlAllowCredentials: false
           OriginOverride: true
         CustomHeadersConfig:
           Items: []
