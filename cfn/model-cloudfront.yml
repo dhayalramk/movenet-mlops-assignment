@@ -5,10 +5,7 @@ Parameters:
   Environment:
     Type: String
     Default: prod
-    AllowedValues:
-      - dev
-      - stg
-      - prod
+    AllowedValues: [dev, stg, prod]
     Description: Environment name (used in resource naming)
 
   AWSAccountId:
@@ -16,6 +13,19 @@ Parameters:
     Description: AWS Account ID used in bucket name
 
 Resources:
+  ModelBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWSAccountId}-${Environment}-movenet-models"
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
   ModelOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
@@ -25,7 +35,7 @@ Resources:
   ModelBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Sub "${AWSAccountId}-${Environment}-movenet-models"
+      Bucket: !Ref ModelBucket
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -34,7 +44,24 @@ Resources:
             Principal:
               CanonicalUser: !GetAtt ModelOAI.S3CanonicalUserId
             Action: "s3:GetObject"
-            Resource: !Sub "arn:aws:s3:::${AWSAccountId}-${Environment}-movenet-models/*"
+            Resource: !Sub "${ModelBucket.Arn}/*"
+
+  ModelResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "ModelResponseHeadersPolicy-${Environment}"
+        CorsConfig:
+          AccessControlAllowOrigins: { Items: ["*"] }
+          AccessControlAllowHeaders: { Items: ["*"] }
+          AccessControlAllowMethods: { Items: ["GET", "HEAD"] }
+          AccessControlAllowCredentials: false
+          OriginOverride: true
+        SecurityHeadersConfig:
+          ContentTypeOptions: { Override: true }
+          FrameOptions: { FrameOption: DENY, Override: true }
+          ReferrerPolicy: { ReferrerPolicy: strict-origin-when-cross-origin, Override: true }
+          XSSProtection: { Protection: true, ModeBlock: true, Override: true }
 
   ModelCloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -44,72 +71,33 @@ Resources:
         DefaultRootObject: ""
         Origins:
           - Id: S3ModelOrigin
-            DomainName: !Sub "${AWSAccountId}-${Environment}-movenet-models.s3.amazonaws.com"
+            DomainName: !GetAtt ModelBucket.RegionalDomainName
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${ModelOAI}"
         DefaultCacheBehavior:
           TargetOriginId: S3ModelOrigin
           ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods:
-            - GET
-            - HEAD
-          CachedMethods:
-            - GET
-            - HEAD
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
           Compress: true
           ForwardedValues:
             QueryString: false
-            Cookies:
-              Forward: none
+            Cookies: { Forward: none }
           ResponseHeadersPolicyId: !Ref ModelResponseHeadersPolicy
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
         Comment: !Sub "CloudFront for MoveNet Models - ${Environment}"
         PriceClass: PriceClass_100
 
-  ModelResponseHeadersPolicy:
-    Type: AWS::CloudFront::ResponseHeadersPolicy
-    Properties:
-      ResponseHeadersPolicyConfig:
-        Name: !Sub "ModelResponseHeadersPolicy-${Environment}"
-        CorsConfig:
-          AccessControlAllowOrigins:
-            Items:
-              - "*"
-          AccessControlAllowHeaders:
-            Items:
-              - "*"
-          AccessControlAllowMethods:
-            Items:
-              - GET
-              - HEAD
-          AccessControlAllowCredentials: false
-          OriginOverride: true
-        CustomHeadersConfig:
-          Items: []
-        SecurityHeadersConfig:
-          ContentTypeOptions:
-            Override: true
-          FrameOptions:
-            FrameOption: DENY
-            Override: true
-          ReferrerPolicy:
-            ReferrerPolicy: strict-origin-when-cross-origin
-            Override: true
-          XSSProtection:
-            Protection: true
-            ModeBlock: true
-            Override: true
-
 Outputs:
+  ModelBucketName:
+    Description: S3 Bucket for models
+    Value: !Ref ModelBucket
+
   ModelCloudFrontURL:
     Description: CloudFront URL for MoveNet models
-    Value: !GetAtt ModelCloudFrontDistribution.DomainName
-    Export:
-      Name: !Sub "${Environment}-ModelCDN-URL"
+    Value: !Sub "https://${ModelCloudFrontDistribution.DomainName}"
 
   CloudFrontDistributionId:
     Description: CloudFront Distribution ID
     Value: !Ref ModelCloudFrontDistribution
-    Export:
-      Name: !Sub "${Environment}-ModelCDN-ID"
