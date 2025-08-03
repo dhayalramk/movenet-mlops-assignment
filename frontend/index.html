@@ -2,105 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>MoveNet Pose Detection</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.13.0"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MoveNet - In Browser</title>
+
+  <!-- Prevent favicon 404 -->
+  <link rel="icon" href="data:," />
+
+  <!-- Local CSS -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- TensorFlow.js core + Pose Detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-  <style> 
-    body { font-family: Arial; margin: 20px; }
-    video, canvas { width: 640px; height: 480px; border: 1px solid #ccc; }
-    #result { white-space: pre-wrap; }
-  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection/dist/movenet.js"></script>
 </head>
 <body>
-  <h1>MoveNet Pose Detection</h1>
+  <div class="container">
+    <div class="header">
+      <h2>MoveNet - In Browser</h2>
+    </div>
 
-  <label for="modelType">Choose model type:</label>
-  <select id="modelType">
-    <option value="SinglePose.Lightning">SinglePose.Lightning</option>
-    <option value="SinglePose.Thunder">SinglePose.Thunder</option>
-    <option value="MultiPose.Lightning">MultiPose.Lightning</option>
-  </select>
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="group">
+        <label>Variant:</label>
+        <select id="variant" class="select">
+          <option value="SINGLEPOSE_LIGHTNING">SinglePose Lightning</option>
+          <option value="SINGLEPOSE_THUNDER">SinglePose Thunder</option>
+          <option value="MULTIPOSE_LIGHTNING">MultiPose Lightning</option>
+        </select>
+      </div>
 
-  <br><br>
-  <video id="video" autoplay muted playsinline></video>
-  <br />
-  <button onclick="runInference()">Run Pose Detection</button>
+      <div class="group grow">
+        <label>Backend URL:</label>
+        <input id="backendUrl" class="input stretch" placeholder="https://your-backend-url" />
+      </div>
 
-  <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
-  <div id="result"></div>
+      <div class="group">
+        <button id="useWebcam" class="btn btn-start">Start Webcam</button>
+        <label class="btn ghost">
+          Choose File
+          <input type="file" id="imageInput" accept="image/*" style="display:none" />
+        </label>
+        <label class="btn ghost">
+          Choose File
+          <input type="file" id="videoInput" accept="video/*" style="display:none" />
+        </label>
+        <button id="exportJson" class="btn ghost">Export JSON</button>
+      </div>
 
-  <script>
-    let detector, video, selectedModel = "SinglePose.Lightning";
+      <div class="group">
+        <button id="storeFrame" class="btn">Send Current Frame To Backend</button>
+        <label class="checkbox">
+          <input type="checkbox" id="autoStore" /> Auto-store every 5s
+        </label>
+        <span id="storeStatus" class="muted"></span>
+      </div>
+    </div>
 
-    const CLOUDFRONT_BASE_URL = "https://d2lhrf3zzm7l1f.cloudfront.net/models";
+    <!-- Three Panels -->
+    <div class="panes">
+      <!-- Panel 1: Canvas -->
+      <section class="panel">
+        <h3>Input & Render</h3>
+        <div class="badges">
+          <span id="variantBadge" class="badge">Variant: –</span>
+          <span id="backendBadge" class="badge muted">Backend: not set</span>
+        </div>
+        <div class="wrap">
+          <video id="video" playsinline></video>
+          <canvas id="canvas"></canvas>
+        </div>
+        <pre id="stats"></pre>
+      </section>
 
-    async function setupCamera() {
-      video = document.getElementById("video");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
+      <!-- Panel 2: Raw JSON -->
+      <section class="panel">
+        <h3>Raw JSON (latest)</h3>
+        <pre id="rawJson" class="codebox">{}</pre>
+      </section>
 
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve(video);
-      });
-    }
+      <!-- Panel 3: Derived Table -->
+      <section class="panel">
+        <h3>Derived View</h3>
+        <div id="derived"><p class="muted">Waiting for detections…</p></div>
+      </section>
+    </div>
 
-    async function loadModel() {
-      const modelType = document.getElementById("modelType").value;
-      selectedModel = modelType;
+    <!-- Error Display -->
+    <pre id="err" class="codebox hidden"></pre>
+    <div id="toast" class="toast hidden"></div>
+  </div>
 
-      let typeEnum = poseDetection.SupportedModels.MoveNet;
-
-      const modelUrl = `${CLOUDFRONT_BASE_URL}/${modelType.toLowerCase().replace(".", "-")}/model.json`;
-
-      detector = await poseDetection.createDetector(typeEnum, {
-        modelType: modelType,
-        modelUrl: modelUrl
-      });
-
-      console.log("✅ Model loaded from:", modelUrl);
-    }
-
-    async function runInference() {
-      await loadModel();  // Load model based on current selection
-
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const poses = await detector.estimatePoses(video);
-      const keypoints = poses[0]?.keypoints || [];
-
-      const base64Image = canvas.toDataURL("image/jpeg");
-
-      const payload = {
-        session_id: "session-" + Date.now(),
-        model_version: selectedModel,
-        keypoints: keypoints,
-        metadata: {
-          device: navigator.userAgent,
-          type: "webcam"
-        },
-        image_base64: base64Image
-      };
-
-      document.getElementById("result").innerText = JSON.stringify(payload, null, 2);
-
-      const response = await fetch("https://your-backend-domain/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-      console.log("Upload Result:", result);
-    }
-
-    async function init() {
-      await setupCamera();
-    }
-
-    init();
-  </script>
+  <!-- App Logic -->
+  <script src="script.js"></script>
 </body>
 </html>
