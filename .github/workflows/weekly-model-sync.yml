@@ -39,7 +39,7 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          pip install boto3 kaggle python-dotenv requests
+          pip install tensorflowjs boto3 requests python-dotenv kaggle requests
 
       - name: 🔄 Sync latest model to S3
         run: |
