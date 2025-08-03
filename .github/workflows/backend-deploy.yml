@@ -13,7 +13,7 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write  # Still needed if using OIDC, optional now
+      id-token: write  # still needed for OIDC fallback if used
 
     env:
       AWS_REGION: ap-south-1
@@ -45,21 +45,32 @@ jobs:
 
       - name: 🚀 Deploy to App Runner
         run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+
+          echo "Resolved SERVICE_ARN: $SERVICE_ARN"
+
           aws apprunner update-service \
-            --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
+            --service-arn $SERVICE_ARN \
             --region ${{ env.AWS_REGION }} \
-            --source-configuration "$(jq -n --arg IMAGE_URI "$IMAGE_URI" --arg ENV "${{ env.ENV }}" --arg REGION "${{ env.AWS_REGION }}" --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" '{
-              ImageRepository: {
-                ImageIdentifier: $IMAGE_URI,
-                ImageRepositoryType: "ECR",
-                ImageConfiguration: {
-                  Port: "8080",
-                  RuntimeEnvironmentVariables: {
-                    ENV: $ENV,
-                    AWS_REGION: $REGION,
-                    AWS_ACCOUNT_ID: $ACCOUNT
+            --source-configuration "$(jq -n \
+              --arg IMAGE_URI "$IMAGE_URI" \
+              --arg ENV "${{ env.ENV }}" \
+              --arg REGION "${{ env.AWS_REGION }}" \
+              --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
+              '{
+                ImageRepository: {
+                  ImageIdentifier: $IMAGE_URI,
+                  ImageRepositoryType: "ECR",
+                  ImageConfiguration: {
+                    Port: "8080",
+                    RuntimeEnvironmentVariables: {
+                      ENV: $ENV,
+                      AWS_REGION: $REGION,
+                      AWS_ACCOUNT_ID: $ACCOUNT
+                    }
                   }
-                }
-              },
-              AutoDeploymentsEnabled: true
-            }')"
+                },
+                AutoDeploymentsEnabled: true
+              }')"
