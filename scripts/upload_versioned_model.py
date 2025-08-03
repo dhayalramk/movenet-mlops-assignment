@@ -1,6 +1,4 @@
-# ✅ scripts/upload_versioned_model.py
 import os
-import zipfile
 import boto3
 import subprocess
 from datetime import datetime
@@ -9,11 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ---------- Configuration ----------
-KAGGLE_USERNAME = os.getenv("KAGGLE_USERNAME")
-KAGGLE_KEY = os.getenv("KAGGLE_KEY")
-KAGGLE_MODEL_URL = "google/movenet"
-MODEL_FILE = "movenet_singlepose_lightning.tflite"  # Change as needed
-
 ENV = os.getenv("ENV", "prod")
 REGION = os.getenv("AWS_REGION", "ap-south-1")
 ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
@@ -23,25 +16,36 @@ BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
 MODEL_DIR = f"/tmp/movenet_model_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
+# List of models to download
+MODELS = {
+    "movenet_singlepose_lightning.tflite":
+        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite",
+
+    "movenet_singlepose_thunder.tflite":
+        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/thunder/tflite/float16/4.tflite",
+
+    "movenet_multipose_lightning.tflite":
+        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/multipose/lightning/tflite/float16/1.tflite"
+}
+
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# ---------- Download model from TensorFlow Hub ----------
-def download_model():
-    print("▶️ Downloading model from TensorFlow Hub...")
+# ---------- Download all models ----------
+def download_models():
+    print("▶️ Downloading models from TensorFlow Hub...")
 
-    model_url = "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite"
-    model_path = os.path.join(MODEL_DIR, MODEL_FILE)
-
-    try:
-        subprocess.run([
-            "curl", "-L", model_url,
-            "-o", model_path,
-            "-H", "User-Agent: Mozilla/5.0"
-        ], check=True)
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"❌ Failed to download model via curl. {e}")
-
-    print(f"✅ Model downloaded to {model_path}")
+    for filename, url in MODELS.items():
+        model_path = os.path.join(MODEL_DIR, filename)
+        print(f"⏬ Downloading: {filename}")
+        try:
+            subprocess.run([
+                "curl", "-L", url,
+                "-o", model_path,
+                "-H", "User-Agent: Mozilla/5.0"
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"❌ Failed to download {filename}. {e}")
+        print(f"✅ Downloaded: {filename}")
 
 # ---------- Upload to S3 ----------
 def upload_to_s3():
@@ -60,6 +64,7 @@ def upload_to_s3():
 
     print(f"✅ Upload complete to s3://{BUCKET_NAME}/{S3_PREFIX}")
 
+# ---------- Run ----------
 if __name__ == "__main__":
-    download_model()
+    download_models()
     upload_to_s3()
