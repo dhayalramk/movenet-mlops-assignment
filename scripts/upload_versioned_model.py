@@ -16,36 +16,32 @@ BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
 MODEL_DIR = f"/tmp/movenet_model_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
-# List of models to download
+# Define model subdirectories and source URLs
 MODELS = {
-    "movenet_singlepose_lightning.tflite":
-        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite",
-
-    "movenet_singlepose_thunder.tflite":
-        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/thunder/tflite/float16/4.tflite",
-
-    "movenet_multipose_lightning.tflite":
-        "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/multipose/lightning/tflite/float16/1.tflite"
+    "singlepose-lightning": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/lightning/tflite/float16/4.tflite",
+    "singlepose-thunder": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/singlepose/thunder/tflite/float16/4.tflite",
+    "multipose-lightning": "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/movenet/multipose/lightning/tflite/float16/1.tflite"
 }
-
-os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ---------- Download all models ----------
 def download_models():
-    print("▶️ Downloading models from TensorFlow Hub...")
+    print("▶️ Downloading models...")
 
-    for filename, url in MODELS.items():
-        model_path = os.path.join(MODEL_DIR, filename)
-        print(f"⏬ Downloading: {filename}")
+    for name, url in MODELS.items():
+        model_path = os.path.join(MODEL_DIR, name)
+        os.makedirs(model_path, exist_ok=True)
+        output_file = os.path.join(model_path, "model.json")  # renamed for tfjs compatibility
+
+        print(f"⏬ {name} → model.json")
         try:
             subprocess.run([
                 "curl", "-L", url,
-                "-o", model_path,
+                "-o", output_file,
                 "-H", "User-Agent: Mozilla/5.0"
             ], check=True)
         except subprocess.CalledProcessError as e:
-            raise Exception(f"❌ Failed to download {filename}. {e}")
-        print(f"✅ Downloaded: {filename}")
+            raise Exception(f"❌ Failed to download {name}. {e}")
+        print(f"✅ Downloaded: {output_file}")
 
 # ---------- Upload to S3 ----------
 def upload_to_s3():
@@ -57,12 +53,12 @@ def upload_to_s3():
         for file in files:
             local_path = os.path.join(root, file)
             relative_path = os.path.relpath(local_path, MODEL_DIR)
-            s3_key = os.path.join(S3_PREFIX, relative_path)
+            s3_key = os.path.join(S3_PREFIX, relative_path).replace("\\", "/")
 
-            print(f"→ Uploading: {s3_key}")
+            print(f"→ Uploading: s3://{BUCKET_NAME}/{s3_key}")
             s3.upload_file(local_path, BUCKET_NAME, s3_key)
 
-    print(f"✅ Upload complete to s3://{BUCKET_NAME}/{S3_PREFIX}")
+    print(f"✅ Upload complete: s3://{BUCKET_NAME}/{S3_PREFIX}")
 
 # ---------- Run ----------
 if __name__ == "__main__":
