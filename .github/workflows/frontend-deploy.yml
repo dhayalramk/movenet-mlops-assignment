@@ -20,6 +20,7 @@ jobs:
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DIST_ID }}
+      FRONTEND_BUCKET_NAME: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-frontend
 
     steps:
       - name: 📥 Checkout Repository
@@ -33,14 +34,15 @@ jobs:
 
       - name: 📤 Sync Frontend to S3
         run: |
-          aws s3 sync ./frontend s3://${{ env.AWS_ACCOUNT_ID }}-${{ env.ENV }}-movenet-frontend \
+          aws s3 sync ./frontend s3://${{ env.FRONTEND_BUCKET_NAME }} \
             --region $AWS_REGION \
             --delete \
+            --only-show-errors \
             --acl public-read \
             --cache-control "max-age=0, no-cache, no-store, must-revalidate"
 
       - name: 🚀 Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
