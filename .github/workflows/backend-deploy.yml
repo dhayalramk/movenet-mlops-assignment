@@ -37,28 +37,28 @@ jobs:
 
       - name: 🐳 Build and Push Docker Image
         run: |
-          IMAGE_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}
+          IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
           docker build -t $IMAGE_URI ./backend
           docker push $IMAGE_URI
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
       - name: 🚀 Deploy to App Runner
         run: |
           aws apprunner update-service \
             --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
             --region ${{ env.AWS_REGION }} \
-            --source-configuration '{
-              "ImageRepository": {
-                "ImageIdentifier": "'"$IMAGE_URI"'",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "8080",
-                  "RuntimeEnvironmentVariables": {
-                    "ENV": "'"${{ env.ENV }}"'",
-                    "AWS_REGION": "'"${{ env.AWS_REGION }}"'",
-                    "AWS_ACCOUNT_ID": "'"${{ env.AWS_ACCOUNT_ID }}"'"
+            --source-configuration "$(jq -n --arg IMAGE_URI "$IMAGE_URI" --arg ENV "${{ env.ENV }}" --arg REGION "${{ env.AWS_REGION }}" --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" '{
+              ImageRepository: {
+                ImageIdentifier: $IMAGE_URI,
+                ImageRepositoryType: "ECR",
+                ImageConfiguration: {
+                  Port: "8080",
+                  RuntimeEnvironmentVariables: {
+                    ENV: $ENV,
+                    AWS_REGION: $REGION,
+                    AWS_ACCOUNT_ID: $ACCOUNT
                   }
                 }
               },
-              "AutoDeploymentsEnabled": true
-            }'
+              AutoDeploymentsEnabled: true
+            }')"
