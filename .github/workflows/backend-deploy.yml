@@ -21,6 +21,7 @@ jobs:
       APP_ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       APP_RUNNER_SERVICE_NAME: movenet-backend-service
+      ECR_ACCESS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccessRole
 
     steps:
       - name: 📥 Checkout Code
@@ -63,6 +64,7 @@ jobs:
                 --arg APP_ENV "${{ env.APP_ENV }}" \
                 --arg REGION "${{ env.AWS_REGION }}" \
                 --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
+                --arg ROLE_ARN "${{ env.ECR_ACCESS_ROLE_ARN }}" \
                 '{
                   ImageRepository: {
                     ImageIdentifier: $IMAGE_URI,
@@ -74,6 +76,9 @@ jobs:
                         AWS_REGION: $REGION,
                         AWS_ACCOUNT_ID: $ACCOUNT
                       }
+                    },
+                    AuthenticationConfiguration: {
+                      AccessRoleArn: $ROLE_ARN
                     }
                   },
                   AutoDeploymentsEnabled: true
@@ -87,21 +92,4 @@ jobs:
               --source-configuration "$(jq -n \
                 --arg IMAGE_URI "$IMAGE_URI" \
                 --arg APP_ENV "${{ env.APP_ENV }}" \
-                --arg REGION "${{ env.AWS_REGION }}" \
-                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
-                '{
-                  ImageRepository: {
-                    ImageIdentifier: $IMAGE_URI,
-                    ImageRepositoryType: "ECR",
-                    ImageConfiguration: {
-                      Port: "8080",
-                      RuntimeEnvironmentVariables: {
-                        APP_ENV: $APP_ENV,
-                        AWS_REGION: $REGION,
-                        AWS_ACCOUNT_ID: $ACCOUNT
-                      }
-                    }
-                  },
-                  AutoDeploymentsEnabled: true
-                }')"
-          fi
+                --arg REGION "${{ env.AWS_RE_
