@@ -53,18 +53,32 @@ jobs:
       - name: 🧾 Fetch ECR Access Role ARN
         id: get-role
         run: |
-          ROLE_ARN=$(aws cloudformation describe-stacks \
-            --stack-name apprunner-ecr-role \
-            --query "Stacks[0].Outputs[?OutputKey=='AppRunnerECRAccessRoleArn'].OutputValue" \
-            --output text)
+          echo "🔍 Trying to fetch AppRunnerECRAccessRoleArn from CloudFormation outputs..."
+      
+          for i in {1..5}; do
+            ROLE_ARN=$(aws cloudformation describe-stacks \
+              --stack-name apprunner-ecr-role \
+              --region ${{ env.AWS_REGION }} \
+              --query "Stacks[0].Outputs[?OutputKey=='AppRunnerECRAccessRoleArn'].OutputValue" \
+              --output text)
+      
+            if [[ "$ROLE_ARN" != "None" && "$ROLE_ARN" != "" ]]; then
+              echo "✅ Fetched Role ARN: $ROLE_ARN"
+              break
+            fi
+      
+            echo "⏳ Output not ready yet. Retrying in 5s..."
+            sleep 5
+          done
       
           if [[ "$ROLE_ARN" == "None" || -z "$ROLE_ARN" ]]; then
-            echo "❌ ERROR: Role ARN not found!"
+            echo "❌ ERROR: Role ARN not found in CloudFormation outputs."
             exit 1
           fi
       
           echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
-          echo "role_arn=$ROLE_ARN" >> $GITHUB_OUTPUT   # ← FIXED
+          echo "role_arn=$ROLE_ARN" >> $GITHUB_OUTPUT
+
 
 
       - name: 🧹 Cleanup ROLLBACK Stack (if exists)
