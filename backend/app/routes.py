@@ -31,7 +31,8 @@ async def upload_result(payload: InferenceResult):
         timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         session_id = payload.session_id
 
-        env = os.getenv("ENV", "dev")
+        # env = os.getenv("ENV", "dev")
+        env = 'prod'
         region = os.getenv("AWS_REGION", "ap-south-1")
         account_id = os.getenv("AWS_ACCOUNT_ID")
         logs_bucket = f"{account_id}-{env}-movenet-logs"
