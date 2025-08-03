@@ -17,7 +17,7 @@ jobs:
 
     env:
       AWS_REGION: ap-south-1
-      BACKEND_IMAGE_NAME: movenet-backend
+      BACKEND_IMAGE_NAME: movenet-backend-prod
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       APP_RUNNER_SERVICE_NAME: movenet-backend-service
