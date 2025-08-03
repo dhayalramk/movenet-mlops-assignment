@@ -268,16 +268,29 @@ async function handleVideo(file) {
 
 function sendCurrentFrame() {
   const latest = allDetections[allDetections.length - 1];
-  if (!latest || !latest.poses || latest.poses.length === 0) {
+  if (!latest || !latest.poses?.length) {
     showToast("No pose data to send.");
     return;
   }
 
+  // 1) pull out just the keypoints arrays
+  const keypoints = latest.poses.map(p => p.keypoints);
+
+  // 2) build a little metadata object
+  const metadata = {
+    timestamp: latest.ts,
+    variant: latest.variant,
+    frameLatencyMs: latest.frameLatencyMs,
+  };
+
+  // 3) grab the image
   const image_base64 = canvas.toDataURL("image/jpeg", 0.9);
 
   const payload = {
-    session_id: sessionId,
-    poses: latest.poses,
+    session_id:   sessionId,
+    model_version: variantSel.value,  // <–– REQUIRED
+    keypoints,                       // <–– NOT "poses"
+    metadata,                        // <–– REQUIRED
     image_base64,
     video_base64: uploadedVideoBase64 || null
   };
@@ -287,16 +300,23 @@ function sendCurrentFrame() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        // log the 422 response body to see exactly what's wrong
+        return res.json().then(err => { throw err });
+      }
+      return res.json();
+    })
     .then(data => {
       storeStatusEl.textContent = data.pose_key || "Uploaded";
       showToast("Frame uploaded.");
     })
     .catch(err => {
-      console.error(err);
-      showToast("Upload failed.");
+      console.error("upload error", err);
+      showToast("Upload failed: " + (err.detail || err.error || "unknown"));
     });
 }
+
 
 // Events
 useWebcamBtn.onclick = () => webcamStream ? stopWebcam() : startWebcam();
