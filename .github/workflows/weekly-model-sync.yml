@@ -21,7 +21,6 @@ jobs:
       KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
       KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
 
-
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -40,31 +39,32 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          pip install boto3 kaggle python-dotenv
+          pip install boto3 kaggle python-dotenv requests
 
-      - name: 🔄 Sync latest model from Kaggle to S3
+      - name: 🔄 Sync latest model to S3
         run: |
           python scripts/upload_versioned_model.py
 
-      - name: 🔍 Fetch CloudFront Distribution ID from Stack (optional)
-        id: cf
+      - name: 🔍 Fetch Model CloudFront Distribution ID
+        id: fetch_cf
         run: |
-          STACK_NAME=movenet-frontend-stack
+          STACK_NAME=movenet-model-cloudfront
           DIST_ID=$(aws cloudformation describe-stacks \
             --region $AWS_REGION \
             --stack-name $STACK_NAME \
             --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
             --output text || echo "")
           if [ -z "$DIST_ID" ]; then
-            echo "⚠️ CloudFront Distribution ID not found. Skipping invalidation."
+            echo "⚠️ CloudFront Distribution ID not found"
           else
             echo "CLOUDFRONT_DIST_ID=$DIST_ID" >> $GITHUB_ENV
-            echo "✅ Found Distribution ID: $DIST_ID"
+            echo "✅ Found CloudFront Distribution ID: $DIST_ID"
           fi
 
-      - name: 🚀 Invalidate CloudFront cache (if available)
+      - name: 🚀 Invalidate CloudFront cache
         if: env.CLOUDFRONT_DIST_ID != ''
         run: |
+          echo "🧹 Invalidating CloudFront /models/*"
           aws cloudfront create-invalidation \
-            --distribution-id $CLOUDFRONT_DIST_ID \
+            --distribution-id "$CLOUDFRONT_DIST_ID" \
             --paths "/models/*"
