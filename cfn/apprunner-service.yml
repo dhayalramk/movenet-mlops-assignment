@@ -27,8 +27,10 @@ Resources:
           ImageConfiguration:
             Port: "8080"
             RuntimeEnvironmentVariables:
-              APP_ENV: !Ref AppEnv
-              AWS_REGION: !Ref "AWS::Region"
+              - Name: APP_ENV
+                Value: !Ref AppEnv
+              - Name: AWS_REGION
+                Value: !Ref AWS::Region
         AuthenticationConfiguration:
           AccessRoleArn: !Ref RoleArn
         AutoDeploymentsEnabled: true
