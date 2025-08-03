@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFront distribution for MoveNet versioned models
 
 Parameters:
-  Env:
+  Environment:
     Type: String
     Default: prod
     AllowedValues:
@@ -16,12 +16,6 @@ Parameters:
     Description: AWS Account ID used in bucket name
 
 Resources:
-  ModelBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    Properties:
-      BucketName: !Sub "${AWSAccountId}-${Env}-movenet-models"
-
   ModelOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
@@ -31,16 +25,16 @@ Resources:
   ModelBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref ModelBucket
+      Bucket: !Sub "${AWSAccountId}-${Environment}-movenet-models"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: AllowCloudFrontServiceGet
+          - Sid: AllowCloudFrontAccess
             Effect: Allow
             Principal:
               CanonicalUser: !GetAtt ModelOAI.S3CanonicalUserId
             Action: "s3:GetObject"
-            Resource: !Sub "arn:aws:s3:::${AWSAccountId}-${Env}-movenet-models/*"
+            Resource: !Sub "arn:aws:s3:::${AWSAccountId}-${Environment}-movenet-models/*"
 
   ModelCloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -50,7 +44,7 @@ Resources:
         DefaultRootObject: ""
         Origins:
           - Id: S3ModelOrigin
-            DomainName: !Sub "${AWSAccountId}-${Env}-movenet-models.s3.amazonaws.com"
+            DomainName: !Sub "${AWSAccountId}-${Environment}-movenet-models.s3.amazonaws.com"
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${ModelOAI}"
         DefaultCacheBehavior:
@@ -69,7 +63,7 @@ Resources:
               Forward: none
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
-        Comment: !Sub "CDN for MoveNet Models - ${Env}"
+        Comment: !Sub "CloudFront for MoveNet Models - ${Environment}"
         PriceClass: PriceClass_100
 
 Outputs:
@@ -77,10 +71,10 @@ Outputs:
     Description: CloudFront URL for MoveNet models
     Value: !GetAtt ModelCloudFrontDistribution.DomainName
     Export:
-      Name: !Sub "${Env}-ModelCDN-URL"
+      Name: !Sub "${Environment}-ModelCDN-URL"
 
   CloudFrontDistributionId:
     Description: CloudFront Distribution ID
     Value: !Ref ModelCloudFrontDistribution
     Export:
-      Name: !Sub "${Env}-ModelCDN-ID"
+      Name: !Sub "${Environment}-ModelCDN-ID"
