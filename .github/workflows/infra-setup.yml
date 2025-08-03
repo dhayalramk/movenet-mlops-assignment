@@ -1,0 +1,54 @@
+name: Infra Setup (One-Time)
+
+on:
+  workflow_dispatch:  # Run manually from GitHub UI
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ap-south-1
+      ENV: prod
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧾 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🚀 Deploy Model Bucket Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cfn/model-bucket.yml \
+            --stack-name movenet-model-bucket \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION \
+            --parameter-overrides Environment=$ENV AWSAccountId=$AWS_ACCOUNT_ID
+
+      - name: 📊 Deploy Logs Bucket Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cfn/logs-bucket.yml \
+            --stack-name movenet-logs-bucket \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION \
+            --parameter-overrides Environment=$ENV AWSAccountId=$AWS_ACCOUNT_ID
+
+      - name: 🌐 Deploy Frontend CloudFront Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cfn/frontend-cloudfront.yml \
+            --stack-name movenet-frontend-stack \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION \
+            --parameter-overrides Environment=$ENV AWSAccountId=$AWS_ACCOUNT_ID
