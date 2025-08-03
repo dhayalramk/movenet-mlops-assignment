@@ -39,11 +39,25 @@ def download_and_extract():
         with open(tar_path, "wb") as f:
             for chunk in r.iter_content(8192):
                 f.write(chunk)
+
         extract_to = os.path.join(RAW_DIR, name)
-        os.makedirs(extract_to, exist_ok=True)
+        temp_extract = os.path.join(extract_to, "_temp")
+        os.makedirs(temp_extract, exist_ok=True)
+
+        # Extract into temp folder
         with tarfile.open(tar_path, "r:gz") as tar:
-            tar.extractall(path=extract_to)
-        print(f"   ✅  Extracted saved_model for {name}")
+            tar.extractall(path=temp_extract)
+
+        # Move contents to `saved_model` inside model dir
+        final_path = os.path.join(extract_to, "saved_model")
+        os.makedirs(final_path, exist_ok=True)
+
+        for item in os.listdir(temp_extract):
+            shutil.move(os.path.join(temp_extract, item), final_path)
+
+        shutil.rmtree(temp_extract)
+        print(f"   ✅  Extracted and organized saved_model for {name}")
+
 
 def convert_to_tfjs():
     for name in MODELS:
