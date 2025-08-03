@@ -76,10 +76,10 @@ jobs:
                         AWS_REGION: $REGION,
                         AWS_ACCOUNT_ID: $ACCOUNT
                       }
-                    },
-                    AuthenticationConfiguration: {
-                      AccessRoleArn: $ROLE_ARN
                     }
+                  },
+                  AuthenticationConfiguration: {
+                    AccessRoleArn: $ROLE_ARN
                   },
                   AutoDeploymentsEnabled: true
                 }')"
@@ -106,10 +106,10 @@ jobs:
                         AWS_REGION: $REGION,
                         AWS_ACCOUNT_ID: $ACCOUNT
                       }
-                    },
-                    AuthenticationConfiguration: {
-                      AccessRoleArn: $ROLE_ARN
                     }
+                  },
+                  AuthenticationConfiguration: {
+                    AccessRoleArn: $ROLE_ARN
                   },
                   AutoDeploymentsEnabled: true
                 }')"
