@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: App Runner Service to deploy Movenet Backend from ECR
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: Full ECR Image URI including tag
+  RoleArn:
+    Type: String
+    Description: IAM role ARN to access ECR
+  AppEnv:
+    Type: String
+    Default: prod
+  AppName:
+    Type: String
+    Default: movenet-backend-service
+
+Resources:
+  MovenetAppRunnerService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: !Ref AppName
+      SourceConfiguration:
+        ImageRepository:
+          ImageRepositoryType: ECR
+          ImageIdentifier: !Ref ImageUri
+          ImageConfiguration:
+            Port: "8080"
+            RuntimeEnvironmentVariables:
+              APP_ENV: !Ref AppEnv
+              AWS_REGION: !Ref "AWS::Region"
+        AuthenticationConfiguration:
+          AccessRoleArn: !Ref RoleArn
+        AutoDeploymentsEnabled: true
