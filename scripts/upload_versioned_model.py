@@ -53,12 +53,19 @@ def upload_to_s3():
         for file in files:
             local_path = os.path.join(root, file)
             relative_path = os.path.relpath(local_path, MODEL_DIR)
-            s3_key = os.path.join(S3_PREFIX, relative_path).replace("\\", "/")
 
-            print(f"→ Uploading: s3://{BUCKET_NAME}/{s3_key}")
-            s3.upload_file(local_path, BUCKET_NAME, s3_key)
+            # Upload to versioned path
+            versioned_key = os.path.join(S3_PREFIX, relative_path).replace("\\", "/")
+            print(f"→ Uploading versioned: s3://{BUCKET_NAME}/{versioned_key}")
+            s3.upload_file(local_path, BUCKET_NAME, versioned_key)
 
-    print(f"✅ Upload complete: s3://{BUCKET_NAME}/{S3_PREFIX}")
+            # Upload to latest stable path
+            if "/" in relative_path:
+                latest_key = os.path.join("models", relative_path).replace("\\", "/")
+                print(f"→ Uploading latest: s3://{BUCKET_NAME}/{latest_key}")
+                s3.upload_file(local_path, BUCKET_NAME, latest_key)
+
+    print(f"✅ Upload complete: versioned + stable paths uploaded.")
 
 # ---------- Run ----------
 if __name__ == "__main__":
