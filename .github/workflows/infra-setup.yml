@@ -1,7 +1,13 @@
-name: Infra Setup (One-Time)
+name: Infra Setup (One-Time or On Change)
 
 on:
-  workflow_dispatch:  # Run manually from GitHub UI
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - 'cfn/**'
+      - '.github/workflows/infra-setup.yml'
 
 jobs:
   deploy-infra:
