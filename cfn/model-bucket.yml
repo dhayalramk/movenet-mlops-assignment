@@ -19,7 +19,7 @@ Resources:
   MoveNetModelBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${AWSAccountId}-${Env}-movenet-bucket"
+      BucketName: !Sub "${AWSAccountId}-${Env}-movenet-model"
       VersioningConfiguration:
         Status: Enabled
       Tags:
