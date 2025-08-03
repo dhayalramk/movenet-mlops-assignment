@@ -18,7 +18,7 @@ jobs:
     env:
       AWS_REGION: ap-south-1
       BACKEND_IMAGE_NAME: movenet-backend-prod
-      ENV: prod
+      APP_ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       APP_RUNNER_SERVICE_NAME: movenet-backend-service
 
@@ -46,7 +46,7 @@ jobs:
       - name: 🚀 Deploy to App Runner
         run: |
           IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}"
-          
+
           SERVICE_ARN=$(aws apprunner list-services \
             --region ${{ env.AWS_REGION }} \
             --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn" \
@@ -60,7 +60,7 @@ jobs:
               --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
               --source-configuration "$(jq -n \
                 --arg IMAGE_URI "$IMAGE_URI" \
-                --arg ENV "${{ env.ENV }}" \
+                --arg APP_ENV "${{ env.APP_ENV }}" \
                 --arg REGION "${{ env.AWS_REGION }}" \
                 --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
                 '{
@@ -70,7 +70,7 @@ jobs:
                     ImageConfiguration: {
                       Port: "8080",
                       RuntimeEnvironmentVariables: {
-                        ENV: $ENV,
+                        APP_ENV: $APP_ENV,
                         AWS_REGION: $REGION,
                         AWS_ACCOUNT_ID: $ACCOUNT
                       }
@@ -78,7 +78,6 @@ jobs:
                   },
                   AutoDeploymentsEnabled: true
                 }')"
-
           else
             echo "🔁 Updating existing App Runner service: $SERVICE_ARN"
 
@@ -87,7 +86,7 @@ jobs:
               --service-arn "$SERVICE_ARN" \
               --source-configuration "$(jq -n \
                 --arg IMAGE_URI "$IMAGE_URI" \
-                --arg ENV "${{ env.ENV }}" \
+                --arg APP_ENV "${{ env.APP_ENV }}" \
                 --arg REGION "${{ env.AWS_REGION }}" \
                 --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
                 '{
@@ -97,7 +96,7 @@ jobs:
                     ImageConfiguration: {
                       Port: "8080",
                       RuntimeEnvironmentVariables: {
-                        ENV: $ENV,
+                        APP_ENV: $APP_ENV,
                         AWS_REGION: $REGION,
                         AWS_ACCOUNT_ID: $ACCOUNT
                       }
