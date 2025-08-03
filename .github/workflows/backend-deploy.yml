@@ -44,73 +44,17 @@ jobs:
           docker build -t $IMAGE_URI ./backend
           docker push $IMAGE_URI
 
-      - name: 🚀 Deploy to App Runner
+      - name: 🚀 Deploy App Runner via CloudFormation
         run: |
           IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}"
 
-          SERVICE_ARN=$(aws apprunner list-services \
+          aws cloudformation deploy \
             --region ${{ env.AWS_REGION }} \
-            --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn" \
-            --output text)
-
-          if [ -z "$SERVICE_ARN" ]; then
-            echo "🆕 Creating new App Runner service: ${{ env.APP_RUNNER_SERVICE_NAME }}"
-
-            aws apprunner create-service \
-              --region ${{ env.AWS_REGION }} \
-              --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
-              --source-configuration "$(jq -n \
-                --arg IMAGE_URI "$IMAGE_URI" \
-                --arg APP_ENV "${{ env.APP_ENV }}" \
-                --arg REGION "${{ env.AWS_REGION }}" \
-                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
-                --arg ROLE_ARN "${{ env.ECR_ACCESS_ROLE_ARN }}" \
-                '{
-                  ImageRepository: {
-                    ImageIdentifier: $IMAGE_URI,
-                    ImageRepositoryType: "ECR",
-                    ImageConfiguration: {
-                      Port: "8080",
-                      RuntimeEnvironmentVariables: {
-                        APP_ENV: $APP_ENV,
-                        AWS_REGION: $REGION,
-                        AWS_ACCOUNT_ID: $ACCOUNT
-                      }
-                    }
-                  },
-                  AuthenticationConfiguration: {
-                    AccessRoleArn: $ROLE_ARN
-                  },
-                  AutoDeploymentsEnabled: true
-                }')"
-          else
-            echo "🔁 Updating existing App Runner service: $SERVICE_ARN"
-
-            aws apprunner update-service \
-              --region ${{ env.AWS_REGION }} \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration "$(jq -n \
-                --arg IMAGE_URI "$IMAGE_URI" \
-                --arg APP_ENV "${{ env.APP_ENV }}" \
-                --arg REGION "${{ env.AWS_REGION }}" \
-                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
-                --arg ROLE_ARN "${{ env.ECR_ACCESS_ROLE_ARN }}" \
-                '{
-                  ImageRepository: {
-                    ImageIdentifier: $IMAGE_URI,
-                    ImageRepositoryType: "ECR",
-                    ImageConfiguration: {
-                      Port: "8080",
-                      RuntimeEnvironmentVariables: {
-                        APP_ENV: $APP_ENV,
-                        AWS_REGION: $REGION,
-                        AWS_ACCOUNT_ID: $ACCOUNT
-                      }
-                    }
-                  },
-                  AuthenticationConfiguration: {
-                    AccessRoleArn: $ROLE_ARN
-                  },
-                  AutoDeploymentsEnabled: true
-                }')"
-          fi
+            --template-file cfn/apprunner-service.yml \
+            --stack-name movenet-apprunner-service \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              ImageUri="$IMAGE_URI" \
+              RoleArn="${{ env.ECR_ACCESS_ROLE_ARN }}" \
+              AppEnv="${{ env.APP_ENV }}" \
+              AppName="${{ env.APP_RUNNER_SERVICE_NAME }}"
