@@ -33,4 +33,6 @@ Resources:
                 Value: !Ref AWS::Region
         AuthenticationConfiguration:
           AccessRoleArn: !Ref RoleArn
-        AutoDeploymentsEnabled: true
+        InstanceConfiguration:
+          Cpu: "1 vCPU"
+          Memory: "2 GB"
