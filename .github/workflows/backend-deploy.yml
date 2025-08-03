@@ -92,4 +92,25 @@ jobs:
               --source-configuration "$(jq -n \
                 --arg IMAGE_URI "$IMAGE_URI" \
                 --arg APP_ENV "${{ env.APP_ENV }}" \
-                --arg REGION "${{ env.AWS_RE_
+                --arg REGION "${{ env.AWS_REGION }}" \
+                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
+                --arg ROLE_ARN "${{ env.ECR_ACCESS_ROLE_ARN }}" \
+                '{
+                  ImageRepository: {
+                    ImageIdentifier: $IMAGE_URI,
+                    ImageRepositoryType: "ECR",
+                    ImageConfiguration: {
+                      Port: "8080",
+                      RuntimeEnvironmentVariables: {
+                        APP_ENV: $APP_ENV,
+                        AWS_REGION: $REGION,
+                        AWS_ACCOUNT_ID: $ACCOUNT
+                      }
+                    },
+                    AuthenticationConfiguration: {
+                      AccessRoleArn: $ROLE_ARN
+                    }
+                  },
+                  AutoDeploymentsEnabled: true
+                }')"
+          fi
