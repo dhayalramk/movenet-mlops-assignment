@@ -59,6 +59,24 @@ jobs:
             --output text)
           echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
           echo "::set-output name=role_arn::$ROLE_ARN"
+
+      - name: 🧹 Cleanup ROLLBACK Stack (if exists)
+        run: |
+          set +e
+          state=$(aws cloudformation describe-stacks \
+            --stack-name movenet-apprunner-service \
+            --region ${{ env.AWS_REGION }} \
+            --query "Stacks[0].StackStatus" --output text 2>/dev/null)
+          if [[ "$state" == "ROLLBACK_COMPLETE" ]]; then
+            echo "Deleting failed stack..."
+            aws cloudformation delete-stack \
+              --stack-name movenet-apprunner-service \
+              --region ${{ env.AWS_REGION }}
+            aws cloudformation wait stack-delete-complete \
+              --stack-name movenet-apprunner-service \
+              --region ${{ env.AWS_REGION }}
+          fi
+
       
       - name: 🚀 Deploy App Runner via CloudFormation
         run: |
