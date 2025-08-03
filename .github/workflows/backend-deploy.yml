@@ -59,11 +59,11 @@ jobs:
             --output text)
           echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
           echo "::set-output name=role_arn::$ROLE_ARN"
-
+      
       - name: 🚀 Deploy App Runner via CloudFormation
         run: |
           IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}"
-
+      
           aws cloudformation deploy \
             --region ${{ env.AWS_REGION }} \
             --template-file cfn/apprunner-service.yml \
