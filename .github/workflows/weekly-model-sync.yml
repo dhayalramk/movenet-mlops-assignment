@@ -18,6 +18,9 @@ jobs:
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       MODEL_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-models
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+
 
     steps:
       - name: 📥 Checkout repository
