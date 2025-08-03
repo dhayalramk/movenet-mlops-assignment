@@ -18,7 +18,6 @@ jobs:
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       MODEL_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-models
-      CLOUDFRONT_DIST_ID: ${{ secrets.CLOUDFRONT_DIST_ID }}
 
     steps:
       - name: 📥 Checkout repository
@@ -37,7 +36,7 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          pip install boto3 kaggle
+          pip install boto3 kaggle python-dotenv
 
       - name: 🔄 Sync latest model from Kaggle to S3
         run: |
@@ -45,6 +44,18 @@ jobs:
             --bucket $MODEL_BUCKET \
             --region $AWS_REGION \
             --env $ENV
+
+      - name: 🔍 Fetch CloudFront Distribution ID from Stack
+        id: cf
+        run: |
+          export STACK_NAME=frontend-static-site
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --region $AWS_REGION \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+          echo "CLOUDFRONT_DIST_ID=$DIST_ID" >> $GITHUB_ENV
+          echo "✅ CloudFront Distribution ID: $DIST_ID"
 
       - name: 🚀 Invalidate CloudFront cache
         run: |
