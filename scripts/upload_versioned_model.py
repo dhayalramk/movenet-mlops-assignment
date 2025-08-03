@@ -1,6 +1,7 @@
 import os
 import boto3
-import subprocess
+import tarfile
+import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -16,47 +17,43 @@ BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
 MODEL_DIR = f"/tmp/movenet_model_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
-# Define model subdirectories and source URLs (TFHub redirectors)
+# Define model tar.gz download URLs
 MODELS = {
-    "singlepose-lightning": "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite",
-    "singlepose-thunder": "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/float16/4?lite-format=tflite",
-    "multipose-lightning": "https://tfhub.dev/google/lite-model/movenet/multipose/lightning/tflite/float16/1?lite-format=tflite"
+    "singlepose-lightning": "https://storage.googleapis.com/tfhub-modules/google/movenet/singlepose/lightning/4.tar.gz",
+    "singlepose-thunder": "https://storage.googleapis.com/tfhub-modules/google/movenet/singlepose/thunder/4.tar.gz",
+    "multipose-lightning": "https://storage.googleapis.com/tfhub-modules/google/movenet/multipose/lightning/1.tar.gz"
 }
 
-# ---------- Check if file is valid binary ----------
-def is_valid_tflite(file_path):
-    try:
-        with open(file_path, "rb") as f:
-            header = f.read(4)
-            return header != b"<?xm"
-    except Exception:
-        return False
+# ---------- Download and extract SavedModels ----------
+def download_and_extract_models():
+    print("▶️ Downloading and extracting models...")
 
-# ---------- Download all models ----------
-def download_models():
-    print("▶️ Downloading models...")
+    os.makedirs(MODEL_DIR, exist_ok=True)
 
     for name, url in MODELS.items():
+        print(f"⏬ Downloading {name}...")
+
+        tar_path = os.path.join(MODEL_DIR, f"{name}.tar.gz")
         model_path = os.path.join(MODEL_DIR, name)
-        os.makedirs(model_path, exist_ok=True)
-        output_file = os.path.join(model_path, "model.json")  # renamed for tfjs compatibility
 
-        print(f"⏬ {name} → model.json")
         try:
-            subprocess.run([
-                "curl", "-L", url,
-                "-o", output_file,
-                "-H", "User-Agent: Mozilla/5.0"
-            ], check=True)
+            # Download .tar.gz file
+            r = requests.get(url, stream=True)
+            r.raise_for_status()
+            with open(tar_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print(f"✅ Downloaded: {tar_path}")
 
-            if not is_valid_tflite(output_file):
-                raise Exception("Invalid file downloaded — likely an HTML/XML error page.")
+            # Extract .tar.gz
+            os.makedirs(model_path, exist_ok=True)
+            with tarfile.open(tar_path, "r:gz") as tar:
+                tar.extractall(path=model_path)
+            print(f"📦 Extracted to: {model_path}")
 
         except Exception as e:
-            print(f"❌ Skipping {name}: {e}")
+            print(f"❌ Error downloading/extracting {name}: {e}")
             continue
-
-        print(f"✅ Downloaded: {output_file}")
 
 # ---------- Upload to S3 ----------
 def upload_to_s3():
@@ -85,7 +82,7 @@ def upload_to_s3():
 # ---------- Run ----------
 if __name__ == "__main__":
     try:
-        download_models()
+        download_and_extract_models()
         upload_to_s3()
     except Exception as err:
         print(f"💥 Error: {err}")
