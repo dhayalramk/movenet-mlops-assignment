@@ -4,7 +4,7 @@ Description: S3 bucket for storing versioned MoveNet models (kaggle/custom)
 Parameters:
   Env:
     Type: String
-    Default: dev
+    Default: prod
     AllowedValues:
       - dev
       - stg
