@@ -41,7 +41,6 @@ Resources:
             Action: "s3:GetObject"
             Resource: !Sub "${FrontendBucket.Arn}/*"
 
-  # Optional CloudFront Distribution
   FrontendCloudFront:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -69,10 +68,17 @@ Resources:
 Outputs:
 
   FrontendBucketName:
+    Description: S3 bucket name for frontend
     Value: !Ref FrontendBucket
 
   WebsiteURL:
+    Description: Public S3 website URL (not CloudFront)
     Value: !Sub "http://${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
 
   CloudFrontURL:
+    Description: CloudFront URL for the frontend
     Value: !Sub "https://${FrontendCloudFront.DomainName}"
+
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID for cache invalidation
+    Value: !Ref FrontendCloudFront
