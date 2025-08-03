@@ -32,19 +32,33 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: 🐛 Debug – List frontend folder contents
+        run: |
+          echo "Listing ./frontend/"
+          ls -alh ./frontend
+
       - name: 🔍 Get CloudFront Distribution ID from Stack Output
         id: cf
         run: |
-          DIST_ID=$(aws cloudformation describe-stacks \
+          DIST_URL=$(aws cloudformation describe-stacks \
             --region $AWS_REGION \
             --stack-name $STACK_NAME \
             --query "Stacks[0].Outputs[?OutputKey=='CloudFrontURL'].OutputValue" \
-            --output text | cut -d'.' -f1)
+            --output text)
+          
+          if [ -z "$DIST_URL" ]; then
+            echo "❌ CloudFront URL not found in stack output"
+            exit 1
+          fi
+
+          DIST_ID=$(echo "$DIST_URL" | cut -d'.' -f1)
           echo "DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
+          echo "✅ CloudFront Distribution ID: $DIST_ID"
 
       - name: 📤 Sync Frontend to S3
         run: |
-          aws s3 sync ./frontend s3://${{ env.FRONTEND_BUCKET_NAME }} \
+          echo "🚀 Syncing frontend to bucket: $FRONTEND_BUCKET_NAME"
+          aws s3 sync ./frontend s3://$FRONTEND_BUCKET_NAME \
             --region $AWS_REGION \
             --delete \
             --only-show-errors \
@@ -53,6 +67,7 @@ jobs:
 
       - name: 🚀 Invalidate CloudFront Cache
         run: |
+          echo "⚡ Invalidating CloudFront cache on: $DISTRIBUTION_ID"
           aws cloudfront create-invalidation \
-            --distribution-id ${{ env.DISTRIBUTION_ID }} \
+            --distribution-id $DISTRIBUTION_ID \
             --paths "/*"
