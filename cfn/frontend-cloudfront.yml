@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 + CloudFront stack for MoveNet frontend UI.
+Description: Create S3 bucket and CloudFront distribution for MoveNet frontend
 
 Parameters:
   Environment:
@@ -83,3 +83,7 @@ Outputs:
   CloudFrontURL:
     Description: Public frontend URL via CloudFront
     Value: !Sub "https://${FrontendCloudFront.DomainName}"
+
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID for invalidation
+    Value: !Ref FrontendCloudFront
