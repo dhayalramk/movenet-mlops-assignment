@@ -13,14 +13,13 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write
 
     env:
       AWS_REGION: ap-south-1
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DIST_ID }}
       FRONTEND_BUCKET_NAME: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-frontend
+      STACK_NAME: frontend-static-site
 
     steps:
       - name: 📥 Checkout Repository
@@ -29,8 +28,19 @@ jobs:
       - name: 🧾 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔍 Get CloudFront Distribution ID from Stack Output
+        id: cf
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --region $AWS_REGION \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontURL'].OutputValue" \
+            --output text | cut -d'.' -f1)
+          echo "DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
 
       - name: 📤 Sync Frontend to S3
         run: |
@@ -44,5 +54,5 @@ jobs:
       - name: 🚀 Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id ${{ env.DISTRIBUTION_ID }} \
             --paths "/*"
