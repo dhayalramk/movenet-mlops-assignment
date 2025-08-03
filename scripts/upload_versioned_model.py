@@ -1,6 +1,5 @@
 import os
 import boto3
-import tarfile
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
@@ -17,46 +16,48 @@ BUCKET_NAME = f"{ACCOUNT_ID}-{ENV}-movenet-models"
 MODEL_DIR = f"/tmp/movenet_tfjs_models_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
+# TFJS-compatible model URLs
 MODELS = {
-    "singlepose-lightning": "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite",
-    "singlepose-thunder": "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/float16/4?lite-format=tflite",
-    "multipose-lightning": "https://tfhub.dev/google/lite-model/movenet/multipose/lightning/tflite/float16/1?lite-format=tflite"
+    "singlepose-lightning": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/singlepose/lightning/model.json",
+    "singlepose-thunder": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/singlepose/thunder/model.json",
+    "multipose-lightning": "https://storage.googleapis.com/tfjs-models/savedmodel/pose/multipose/lightning/model.json"
 }
 
 
-def download_and_extract_tfjs_models():
-    print("▶️ Downloading and extracting TFJS models...")
+def download_tfjs_models():
+    print("▶️ Downloading TFJS models...")
 
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     for name, url in MODELS.items():
-        print(f"⏬ Downloading {name}...")
         model_path = os.path.join(MODEL_DIR, name)
         os.makedirs(model_path, exist_ok=True)
 
         try:
-            # Manually resolve the .tar.gz URL by following redirect
-            head = requests.head(url, allow_redirects=True)
-            final_url = head.url
-            filename = final_url.split("/")[-1]
+            print(f"⏬ Downloading {name} model.json...")
+            model_json = requests.get(url)
+            model_json.raise_for_status()
 
-            # Download
-            tar_path = os.path.join(MODEL_DIR, f"{name}.tar.gz")
-            r = requests.get(final_url, stream=True)
-            r.raise_for_status()
-            with open(tar_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"✅ Downloaded: {filename}")
+            model_json_path = os.path.join(model_path, "model.json")
+            with open(model_json_path, "wb") as f:
+                f.write(model_json.content)
 
-            # Extract
-            with tarfile.open(tar_path, "r:gz") as tar:
-                tar.extractall(path=model_path)
-            print(f"📦 Extracted to: {model_path}")
+            # Parse JSON to get .bin files
+            bin_files = model_json.json().get("weightsManifest", [])[0].get("paths", [])
+
+            for bin_file in bin_files:
+                bin_url = url.replace("model.json", bin_file)
+                print(f"⏬ Downloading {bin_file}...")
+                bin_data = requests.get(bin_url)
+                bin_data.raise_for_status()
+                with open(os.path.join(model_path, bin_file), "wb") as f:
+                    f.write(bin_data.content)
+
+            print(f"✅ Downloaded: {name} with model.json and weights")
 
         except Exception as e:
-            print(f"❌ Error downloading/extracting {name}: {e}")
-            continue
+            print(f"❌ Error downloading {name}: {e}")
+
 
 def upload_to_s3():
     print("⬆️ Uploading to S3...")
@@ -68,12 +69,10 @@ def upload_to_s3():
             local_path = os.path.join(root, file)
             relative_path = os.path.relpath(local_path, MODEL_DIR)
 
-            # Upload to versioned path
             versioned_key = os.path.join(S3_PREFIX, relative_path).replace("\\", "/")
             print(f"→ Uploading versioned: s3://{BUCKET_NAME}/{versioned_key}")
             s3.upload_file(local_path, BUCKET_NAME, versioned_key)
 
-            # Upload to latest path
             if "/" in relative_path:
                 latest_key = os.path.join("models", relative_path).replace("\\", "/")
                 print(f"→ Uploading stable: s3://{BUCKET_NAME}/{latest_key}")
@@ -81,9 +80,10 @@ def upload_to_s3():
 
     print("✅ Upload complete.")
 
+
 if __name__ == "__main__":
     try:
-        download_and_extract_tfjs_models()
+        download_tfjs_models()
         upload_to_s3()
     except Exception as err:
         print(f"💥 Error: {err}")
