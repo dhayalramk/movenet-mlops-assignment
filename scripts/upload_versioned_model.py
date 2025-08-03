@@ -1,10 +1,10 @@
+# ✅ scripts/upload_versioned_model.py
 import os
 import zipfile
 import boto3
 import subprocess
 from datetime import datetime
 from dotenv import load_dotenv
-import json
 
 load_dotenv()
 
@@ -25,38 +25,6 @@ S3_PREFIX = f"models/{VERSION}/"
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-def get_cloudfront_info(stack_name: str):
-    print(f"🔍 Fetching CloudFront info from stack: {stack_name}")
-    result = subprocess.run([
-        "aws", "cloudformation", "describe-stacks",
-        "--stack-name", stack_name,
-        "--region", REGION,
-        "--query", "Stacks[0].Outputs",
-        "--output", "json"
-    ], stdout=subprocess.PIPE, check=True)
-
-    outputs = json.loads(result.stdout)
-    dist_id = None
-    dist_url = None
-
-    for item in outputs:
-        if item["OutputKey"] == "CloudFrontURL":
-            dist_url = item["OutputValue"]
-        elif item["OutputKey"] == "CloudFrontDistributionId":
-            dist_id = item["OutputValue"]
-
-    if not dist_url or not dist_id:
-        raise ValueError("❌ CloudFront values not found in stack outputs")
-
-    print(f"✅ CloudFront URL: {dist_url}")
-    print(f"✅ CloudFront Distribution ID: {dist_id}")
-    return dist_id, dist_url
-
-
-STACK_NAME = os.getenv("STACK_NAME", "movenet-frontend-stack")
-CLOUDFRONT_DIST_ID, CLOUDFRONT_URL = get_cloudfront_info(STACK_NAME)
-
-
 # ---------- Download model from Kaggle ----------
 def download_model():
     print("▶️ Downloading model from Kaggle...")
@@ -64,7 +32,6 @@ def download_model():
     os.environ["KAGGLE_USERNAME"] = KAGGLE_USERNAME
     os.environ["KAGGLE_KEY"] = KAGGLE_KEY
 
-    # Download model files
     subprocess.run([
         "kaggle", "datasets", "download",
         "-d", KAGGLE_MODEL_URL,
@@ -90,7 +57,6 @@ def upload_to_s3():
             s3.upload_file(local_path, BUCKET_NAME, s3_key)
 
     print(f"✅ Upload complete to s3://{BUCKET_NAME}/{S3_PREFIX}")
-
 
 if __name__ == "__main__":
     download_model()
