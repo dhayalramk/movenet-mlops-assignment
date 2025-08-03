@@ -2,20 +2,35 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: App Runner Service to deploy Movenet Backend from ECR
 
 Parameters:
-  ImageUri:
-    Type: String
-    Description: Full ECR Image URI including tag
-  RoleArn:
-    Type: String
-    Description: IAM role ARN to access ECR
-  AppEnv:
-    Type: String
-    Default: prod
-  AppName:
-    Type: String
-    Default: movenet-backend-service
+  ImageUri:    { Type: String }
+  RoleArn:     { Type: String }  # (for ECR pull)
+  AppEnv:      { Type: String, Default: prod }
+  AppName:     { Type: String, Default: movenet-backend-service }
 
 Resources:
+  AppRunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-InstanceRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3UploadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !Sub "arn:aws:s3:::${AWS::AccountId}-${AppEnv}-movenet-logs/*"
+
   MovenetAppRunnerService:
     Type: AWS::AppRunner::Service
     Properties:
@@ -32,8 +47,10 @@ Resources:
               - Name: AWS_REGION
                 Value: !Ref AWS::Region
         AuthenticationConfiguration:
-          AccessRoleArn: !Ref RoleArn
+          AccessRoleArn: !Ref RoleArn     # your ECR-pull role
         AutoDeploymentsEnabled: true
-      InstanceConfiguration:  # ← FIXED: moved outside SourceConfiguration
-        Cpu: "2 vCPU"
-        Memory: "4 GB"
+
+      InstanceConfiguration:
+        Cpu:             "2 vCPU"
+        Memory:          "4 GB"
+        InstanceRoleArn: !GetAtt AppRunnerInstanceRole.Arn
