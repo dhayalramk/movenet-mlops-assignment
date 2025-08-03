@@ -45,7 +45,10 @@ Resources:
           - Id: S3ModelOrigin
             DomainName: !Sub "${AWSAccountId}-${Environment}-movenet-models.s3.amazonaws.com"
             S3OriginConfig:
-              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${ModelOAI}"
+              OriginAccessIdentity: !Join
+                - "/"
+                - - "origin-access-identity/cloudfront"
+                  - !Ref ModelOAI              
         DefaultCacheBehavior:
           TargetOriginId: S3ModelOrigin
           ViewerProtocolPolicy: redirect-to-https
