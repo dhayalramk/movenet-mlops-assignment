@@ -70,3 +70,13 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id $DISTRIBUTION_ID \
             --paths "/*"
+
+      - name: 📎 Print Deployed CloudFront URL
+        run: |
+          URL=$(aws cloudformation describe-stacks \
+            --region $AWS_REGION \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontURL'].OutputValue" \
+            --output text)
+          echo "✅ Deployed URL: $URL"
+  
