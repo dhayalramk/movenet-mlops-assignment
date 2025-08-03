@@ -1,0 +1,53 @@
+name: Weekly Model Sync from Kaggle
+
+on:
+  schedule:
+    - cron: '30 1 * * 1' # Every Monday 07:00 IST (01:30 UTC)
+  workflow_dispatch:
+
+jobs:
+  sync-model:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ap-south-1
+      ENV: prod
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      MODEL_BUCKET: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-models
+      CLOUDFRONT_DIST_ID: ${{ secrets.CLOUDFRONT_DIST_ID }}
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🧾 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🐍 Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install boto3 kaggle
+
+      - name: 🔄 Sync latest model from Kaggle to S3
+        run: |
+          python scripts/upload_versioned_model.py \
+            --bucket $MODEL_BUCKET \
+            --region $AWS_REGION \
+            --env $ENV
+
+      - name: 🚀 Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id $CLOUDFRONT_DIST_ID \
+            --paths "/models/*"
