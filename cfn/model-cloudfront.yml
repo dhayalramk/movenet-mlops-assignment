@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFront distribution for MoveNet versioned models
+Description: CloudFront distribution for MoveNet versioned models (with OAI and versioned model support)
 
 Parameters:
   Environment:
@@ -41,7 +41,6 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        DefaultRootObject: ""
         Origins:
           - Id: S3ModelOrigin
             DomainName: !Sub "${AWSAccountId}-${Environment}-movenet-models.s3.amazonaws.com"
@@ -61,10 +60,33 @@ Resources:
             QueryString: false
             Cookies:
               Forward: none
+          ResponseHeadersPolicyId: !Ref ModelResponseHeadersPolicy
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
         Comment: !Sub "CloudFront for MoveNet Models - ${Environment}"
         PriceClass: PriceClass_100
+
+  ModelResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${Environment}-movenet-model-cors"
+        Comment: Allow CORS for model.json access
+        CorsConfig:
+          AccessControlAllowOrigins:
+            Items:
+              - "*"
+          AccessControlAllowMethods:
+            Items: ["GET", "HEAD"]
+          AccessControlAllowHeaders:
+            Items: ["*"]
+          OriginOverride: true
+          AccessControlAllowCredentials: false
+        CustomHeadersConfig:
+          Items:
+            - Header: "Access-Control-Allow-Origin"
+              Value: "*"
+              Override: true
 
 Outputs:
   ModelCloudFrontURL:
