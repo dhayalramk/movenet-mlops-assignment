@@ -57,8 +57,15 @@ jobs:
             --stack-name apprunner-ecr-role \
             --query "Stacks[0].Outputs[?OutputKey=='AppRunnerECRAccessRoleArn'].OutputValue" \
             --output text)
+      
+          if [[ "$ROLE_ARN" == "None" || -z "$ROLE_ARN" ]]; then
+            echo "❌ ERROR: Role ARN not found!"
+            exit 1
+          fi
+      
           echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
-          echo "::set-output name=role_arn::$ROLE_ARN"
+          echo "role_arn=$ROLE_ARN" >> $GITHUB_OUTPUT   # ← FIXED
+
 
       - name: 🧹 Cleanup ROLLBACK Stack (if exists)
         run: |
