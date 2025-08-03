@@ -33,3 +33,8 @@ Resources:
                 Action:
                   - ecr:GetAuthorizationToken
                 Resource: "*"
+
+Outputs:
+  AppRunnerECRAccessRoleArn:
+    Description: IAM role ARN for App Runner to access ECR
+    Value: !GetAtt AppRunnerECRAccessRole.Arn
