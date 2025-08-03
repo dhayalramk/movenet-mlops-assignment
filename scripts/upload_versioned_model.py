@@ -18,10 +18,11 @@ MODEL_DIR = f"/tmp/movenet_tfjs_models_{VERSION}/"
 S3_PREFIX = f"models/{VERSION}/"
 
 MODELS = {
-    "singlepose-lightning": "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4?tfjs-format=file",
-    "singlepose-thunder": "https://tfhub.dev/google/tfjs-model/movenet/singlepose/thunder/4?tfjs-format=file",
-    "multipose-lightning": "https://tfhub.dev/google/tfjs-model/movenet/multipose/lightning/1?tfjs-format=file",
+    "singlepose-lightning": "https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite",
+    "singlepose-thunder": "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/float16/4?lite-format=tflite",
+    "multipose-lightning": "https://tfhub.dev/google/lite-model/movenet/multipose/lightning/tflite/float16/1?lite-format=tflite"
 }
+
 
 def download_and_extract_tfjs_models():
     print("▶️ Downloading and extracting TFJS models...")
