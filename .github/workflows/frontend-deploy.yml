@@ -19,7 +19,7 @@ jobs:
       ENV: prod
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       FRONTEND_BUCKET_NAME: ${{ secrets.AWS_ACCOUNT_ID }}-prod-movenet-frontend
-      STACK_NAME: frontend-static-site
+      STACK_NAME: movenet-frontend-stack
 
     steps:
       - name: 📥 Checkout Repository
@@ -40,20 +40,20 @@ jobs:
       - name: 🔍 Get CloudFront Distribution ID from Stack Output
         id: cf
         run: |
-          DIST_URL=$(aws cloudformation describe-stacks \
+          DIST_ID=$(aws cloudformation describe-stacks \
             --region $AWS_REGION \
             --stack-name $STACK_NAME \
-            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontURL'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
             --output text)
-          
-          if [ -z "$DIST_URL" ]; then
-            echo "❌ CloudFront URL not found in stack output"
+      
+          if [ -z "$DIST_ID" ]; then
+            echo "❌ CloudFront Distribution ID not found"
             exit 1
           fi
-
-          DIST_ID=$(echo "$DIST_URL" | cut -d'.' -f1)
+      
           echo "DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
           echo "✅ CloudFront Distribution ID: $DIST_ID"
+
 
       - name: 📤 Sync Frontend to S3
         run: |
