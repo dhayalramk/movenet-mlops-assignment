@@ -74,12 +74,15 @@ Resources:
         Name: !Sub "ModelResponseHeadersPolicy-${Environment}"
         CorsConfig:
           AccessControlAllowOrigins:
-            - "*"
+            Items:
+              - "*"
           AccessControlAllowHeaders:
-            - "*"
+            Items:
+              - "*"
           AccessControlAllowMethods:
-            - GET
-            - HEAD
+            Items:
+              - GET
+              - HEAD
           OriginOverride: true
         CustomHeadersConfig:
           Items: []
