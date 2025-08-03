@@ -13,7 +13,7 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write  # still needed for OIDC fallback if used
+      id-token: write
 
     env:
       AWS_REGION: ap-south-1
@@ -45,32 +45,64 @@ jobs:
 
       - name: 🚀 Deploy to App Runner
         run: |
+          IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_IMAGE_NAME }}:${GITHUB_SHA}"
+          
           SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
             --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn" \
             --output text)
 
-          echo "Resolved SERVICE_ARN: $SERVICE_ARN"
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "🆕 Creating new App Runner service: ${{ env.APP_RUNNER_SERVICE_NAME }}"
 
-          aws apprunner update-service \
-            --service-arn $SERVICE_ARN \
-            --region ${{ env.AWS_REGION }} \
-            --source-configuration "$(jq -n \
-              --arg IMAGE_URI "$IMAGE_URI" \
-              --arg ENV "${{ env.ENV }}" \
-              --arg REGION "${{ env.AWS_REGION }}" \
-              --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
-              '{
-                ImageRepository: {
-                  ImageIdentifier: $IMAGE_URI,
-                  ImageRepositoryType: "ECR",
-                  ImageConfiguration: {
-                    Port: "8080",
-                    RuntimeEnvironmentVariables: {
-                      ENV: $ENV,
-                      AWS_REGION: $REGION,
-                      AWS_ACCOUNT_ID: $ACCOUNT
+            aws apprunner create-service \
+              --region ${{ env.AWS_REGION }} \
+              --service-name ${{ env.APP_RUNNER_SERVICE_NAME }} \
+              --source-configuration "$(jq -n \
+                --arg IMAGE_URI "$IMAGE_URI" \
+                --arg ENV "${{ env.ENV }}" \
+                --arg REGION "${{ env.AWS_REGION }}" \
+                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
+                '{
+                  ImageRepository: {
+                    ImageIdentifier: $IMAGE_URI,
+                    ImageRepositoryType: "ECR",
+                    ImageConfiguration: {
+                      Port: "8080",
+                      RuntimeEnvironmentVariables: {
+                        ENV: $ENV,
+                        AWS_REGION: $REGION,
+                        AWS_ACCOUNT_ID: $ACCOUNT
+                      }
                     }
-                  }
-                },
-                AutoDeploymentsEnabled: true
-              }')"
+                  },
+                  AutoDeploymentsEnabled: true
+                }')"
+
+          else
+            echo "🔁 Updating existing App Runner service: $SERVICE_ARN"
+
+            aws apprunner update-service \
+              --region ${{ env.AWS_REGION }} \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration "$(jq -n \
+                --arg IMAGE_URI "$IMAGE_URI" \
+                --arg ENV "${{ env.ENV }}" \
+                --arg REGION "${{ env.AWS_REGION }}" \
+                --arg ACCOUNT "${{ env.AWS_ACCOUNT_ID }}" \
+                '{
+                  ImageRepository: {
+                    ImageIdentifier: $IMAGE_URI,
+                    ImageRepositoryType: "ECR",
+                    ImageConfiguration: {
+                      Port: "8080",
+                      RuntimeEnvironmentVariables: {
+                        ENV: $ENV,
+                        AWS_REGION: $REGION,
+                        AWS_ACCOUNT_ID: $ACCOUNT
+                      }
+                    }
+                  },
+                  AutoDeploymentsEnabled: true
+                }')"
+          fi
