@@ -53,7 +53,7 @@ def get_cloudfront_info(stack_name: str):
     return dist_id, dist_url
 
 
-STACK_NAME = os.getenv("STACK_NAME", "frontend-static-site")
+STACK_NAME = os.getenv("STACK_NAME", "movenet-frontend-stack")
 CLOUDFRONT_DIST_ID, CLOUDFRONT_URL = get_cloudfront_info(STACK_NAME)
 
 
