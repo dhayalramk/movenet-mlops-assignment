@@ -1,4 +1,4 @@
-Demo Link: [https://d2winlq3m1yqc3.cloudfront.net/ ](https://dt6vhk6plsry1.cloudfront.net/)
+Demo Link: [https://dt6vhk6plsry1.cloudfront.net/](https://dt6vhk6plsry1.cloudfront.net/)
 
 # Deploy (CI/CD-first)
 
