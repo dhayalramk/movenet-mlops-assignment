@@ -31,13 +31,21 @@ async def upload_result(payload: InferenceResult):
         timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         session_id = payload.session_id
 
-        # env = os.getenv("ENV", "dev")
-        env = 'prod'
+        env = os.getenv("ENV", "prod")
         region = os.getenv("AWS_REGION", "ap-south-1")
         account_id = os.getenv("AWS_ACCOUNT_ID")
+        access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+
         logs_bucket = f"{account_id}-{env}-movenet-logs"
 
-        s3 = boto3.client("s3", region_name=region)
+        # Create boto3 client with explicit credentials
+        s3 = boto3.client(
+            "s3",
+            region_name=region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key
+        )
 
         # Save pose inference JSON
         pose_key = f"inference/{session_id}_{timestamp}.json"
@@ -93,4 +101,16 @@ async def get_metrics():
         "model_version": "v1",
         "avg_inference_time_ms": 75,
         "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+# ---------- Debug Env Vars ----------
+@router.get("/env-debug", tags=["Debug"])
+def env_debug():
+    return {
+        "ENV": os.getenv("ENV"),
+        "AWS_REGION": os.getenv("AWS_REGION"),
+        "AWS_ACCOUNT_ID": os.getenv("AWS_ACCOUNT_ID"),
+        "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
+        "AWS_SECRET_ACCESS_KEY_PRESENT": bool(os.getenv("AWS_SECRET_ACCESS_KEY"))
     }
