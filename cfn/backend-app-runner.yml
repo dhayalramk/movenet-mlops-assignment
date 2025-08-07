@@ -15,6 +15,16 @@ Parameters:
     Type: String
     Default: ap-south-1
 
+  AWSAccessKeyId:
+    Type: String
+    NoEcho: true
+    Description: AWS Access Key ID
+
+  AWSSecretAccessKey:
+    Type: String
+    NoEcho: true
+    Description: AWS Secret Access Key
+
 Resources:
 
   ## 1. ECR Repo for Backend Image
@@ -56,6 +66,8 @@ Resources:
               ENV: !Ref Environment
               AWS_REGION: !Ref AWSRegion
               AWS_ACCOUNT_ID: !Ref AWSAccountId
+              AWS_ACCESS_KEY_ID: !Ref AWSAccessKeyId
+              AWS_SECRET_ACCESS_KEY: !Ref AWSSecretAccessKey
         AutoDeploymentsEnabled: true
       InstanceConfiguration:
         Cpu: "1 vCPU"
